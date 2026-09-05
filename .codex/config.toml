@@ -1,0 +1,16 @@
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+
+[projects."/home/takashi"]
+trust_level = "trusted"
+
+[features]
+hooks = true
+
+[tui.model_availability_nux]
+gpt-6-astra = 2
+
+[hooks.state]
+
+[hooks.state."/home/takashi/.codex/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:10f24b3db44d6ae53bf6ccdba09cd79df5092e99f247f18b61c29172b34cc0df"
