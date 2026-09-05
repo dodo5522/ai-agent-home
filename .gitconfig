@@ -1,0 +1,5 @@
+[user]
+	email = codex@ai-agent.local
+	name = Codex on Herdr
+[core]
+	editor = vim
