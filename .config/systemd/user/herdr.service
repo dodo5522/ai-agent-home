@@ -8,8 +8,8 @@ After=network-online.target
 Type=simple
 Environment=HOME=/home/takashi
 Environment=PATH=/home/takashi/.local/bin:/home/takashi/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
-ExecStart=/home/takashi/.local/bin/herdr server
-ExecStop=/home/takashi/.local/bin/herdr server stop
+ExecStart=/home/takashi/.local/share/mise/shims/herdr server
+ExecStop=/home/takashi/.local/share/mise/shims/herdr server stop
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s

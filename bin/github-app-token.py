@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/takashi/.local/share/mise/shims/python3
 
 '''
 This script generates a JSON Web Token (JWT) for a GitHub App.
@@ -114,7 +114,7 @@ def main() -> int:
         return 1
 
     # stdoutにはtokenだけを出す。
-    # TOKEN="$(github-app-token)" のように安全に利用できる。
+    # TOKEN="$(github-app-token.py)" のように安全に利用できる。
     print(token)
 
     return 0
