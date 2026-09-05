@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HERDR_BIN=${HERDR_BIN:-/home/takashi/.local/bin/herdr}
+HERDR_BIN=${HERDR_BIN:-/home/takashi/.local/share/mise/shims/herdr}
 CODEX_SESSION_INDEX=${CODEX_SESSION_INDEX:-${HOME}/.codex/session_index.jsonl}
 LOCK_FILE=${LOCK_FILE:-${XDG_RUNTIME_DIR:-/tmp}/herdr-agents.lock}
 SERVER_WAIT_ATTEMPTS=${SERVER_WAIT_ATTEMPTS:-60}
