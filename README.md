@@ -21,7 +21,7 @@ Codex セッションを自動復旧するためのホームディレクトリ�
 - Tailscale
 - mise
 - `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python
-- `bin/github-app-token` が使用する Python パッケージ `PyJWT[crypto]`
+- `bin/github-app-token.py` が使用する Python パッケージ `PyJWT[crypto]`
 
 既に存在する Tailscale と mise は再インストールしません。`apt-get`、
 `mise install`、`pip install` は再実行しても安全な形で呼び出します。

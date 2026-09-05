@@ -114,7 +114,7 @@ def main() -> int:
         return 1
 
     # stdoutにはtokenだけを出す。
-    # TOKEN="$(github-app-token)" のように安全に利用できる。
+    # TOKEN="$(github-app-token.py)" のように安全に利用できる。
     print(token)
 
     return 0

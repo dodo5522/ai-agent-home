@@ -71,7 +71,7 @@ test_runtime_paths_use_mise_shims() {
     local bootstrap
 
     service=$(cat "$REPO_ROOT/.config/systemd/user/herdr.service")
-    shebang=$(head -n 1 "$REPO_ROOT/bin/github-app-token")
+    shebang=$(head -n 1 "$REPO_ROOT/bin/github-app-token.py")
     bootstrap=$(cat "$REPO_ROOT/bin/start-herdr-agents.sh")
 
     assert_contains \
