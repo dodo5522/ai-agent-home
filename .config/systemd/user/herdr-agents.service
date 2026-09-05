@@ -1,0 +1,18 @@
+[Unit]
+Description=Restore or start Herdr-managed Codex agents
+Requires=herdr.service
+After=herdr.service
+StartLimitIntervalSec=300
+StartLimitBurst=6
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=HOME=/home/takashi
+Environment=PATH=/home/takashi/.local/bin:/home/takashi/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/takashi/bin/start-herdr-agents.sh
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target
