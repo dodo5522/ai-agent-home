@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+
+'''
+This script generates a JSON Web Token (JWT) for a GitHub App.
+This script requires config and private-key.pem files in .config/github-app directory.
+
+References:
+https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app?utm_source=chatgpt.com
+'''
+
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+import jwt
+
+
+CONFIG_DIR = Path.home() / ".config" / "github-app"
+CONFIG_FILE = CONFIG_DIR / "config"
+PRIVATE_KEY_FILE = CONFIG_DIR / "private-key.pem"
+
+
+def load_config(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+
+        if not line or line.startswith("#"):
+            continue
+
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+
+        values[key.strip()] = value.strip().strip("'\"")
+
+    return values
+
+
+def main() -> int:
+    if not CONFIG_FILE.is_file():
+        print(f"config file not found: {CONFIG_FILE}", file=sys.stderr)
+        return 1
+
+    if not PRIVATE_KEY_FILE.is_file():
+        print(f"private key not found: {PRIVATE_KEY_FILE}", file=sys.stderr)
+        return 1
+
+    config = load_config(CONFIG_FILE)
+
+    client_id = config.get("GITHUB_APP_CLIENT_ID")
+    installation_id = config.get("GITHUB_APP_INSTALLATION_ID")
+
+    if not client_id:
+        print("GITHUB_APP_CLIENT_ID is not configured", file=sys.stderr)
+        return 1
+
+    if not installation_id:
+        print("GITHUB_APP_INSTALLATION_ID is not configured", file=sys.stderr)
+        return 1
+
+    private_key = PRIVATE_KEY_FILE.read_bytes()
+
+    now = int(time.time())
+
+    app_jwt = jwt.encode(
+        {
+            # GitHub recommends allowing for clock drift.
+            "iat": now - 60,
+            "exp": now + 600,
+            "iss": client_id,
+        },
+        private_key,
+        algorithm="RS256",
+    )
+
+    request = urllib.request.Request(
+        (
+            "https://api.github.com/app/installations/"
+            f"{installation_id}/access_tokens"
+        ),
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {app_jwt}",
+            "X-GitHub-Api-Version": "2026-03-10",
+            "User-Agent": "herdr-ai-agent",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(request) as response:
+            body = json.load(response)
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        print(
+            f"GitHub API returned HTTP {exc.code}: {error_body}",
+            file=sys.stderr,
+        )
+        return 1
+    except urllib.error.URLError as exc:
+        print(f"GitHub API request failed: {exc}", file=sys.stderr)
+        return 1
+
+    token = body.get("token")
+
+    if not token:
+        print("GitHub API response did not contain a token", file=sys.stderr)
+        return 1
+
+    # stdoutにはtokenだけを出す。
+    # TOKEN="$(github-app-token)" のように安全に利用できる。
+    print(token)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+

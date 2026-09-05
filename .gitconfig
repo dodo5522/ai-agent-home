@@ -3,3 +3,5 @@
 	name = Codex on Herdr
 [core]
 	editor = vim
+[credential "https://github.com"]
+	helper = /home/takashi/bin/git-credential-github-app
