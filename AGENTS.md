@@ -34,11 +34,25 @@ When the user reports that a Pull Request has been merged:
 
 When creating additional working data:
 
-- Create Git worktrees under `/home/takashi/work/worktrees/`.
-- Clone repositories under `/home/takashi/work/repos/`.
-- Create agent-managed temporary files and directories under `/home/takashi/work/tmp/`.
-- Do not create these resources outside `/home/takashi/work` unless the user explicitly requests another location or a tool requires a system-managed temporary location.
-- Before deleting temporary data, verify that the resolved target path is contained within `/home/takashi/work`.
+- Create a unique task root under `/home/takashi/work/tasks/<task-id>/`.
+- Create a `.codex-task-root` marker file directly inside the task root.
+- Place all Git worktrees, cloned repositories, and agent-managed temporary data for that task inside its task root, using subdirectories such as `worktree/`, `repo/`, and `tmp/`.
+- Do not create these resources outside the task root unless the user explicitly requests another location or a tool requires a system-managed temporary location.
+- Keep the task root while its Pull Request is open or may still receive review updates.
+
+## Task workspace cleanup
+
+When the user reports that a Pull Request has been merged, first complete the post-merge `main` synchronization, then clean up that task's workspace. For work without a Pull Request, clean it up after the user confirms that the task is complete.
+
+Before cleanup:
+
+- Resolve and display the exact task-root path.
+- Confirm that the resolved path is strictly below `/home/takashi/work/tasks/` and is neither `/home/takashi/work` nor `/home/takashi/work/tasks` itself.
+- Confirm that the `.codex-task-root` marker exists directly inside the resolved task root.
+- Confirm that no Git worktree registered by any repository is actively using a path inside the task root.
+- Request one approval for recursively deleting the entire task root; do not request approval separately for each contained file or directory.
+
+After approval, delete the task root in one operation and report the deleted path and whether recovery is possible.
 
 ## Commit policy
 
