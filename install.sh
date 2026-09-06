@@ -116,7 +116,7 @@ fi
 log "installing Ubuntu packages"
 run_as_root apt-get update
 run_as_root apt-get install -y --no-install-recommends \
-    build-essential ca-certificates curl git jq util-linux
+    build-essential ca-certificates curl git jq gh util-linux
 
 if [[ $DRY_RUN == true ]] || ! command -v tailscale >/dev/null 2>&1; then
     log "installing Tailscale"
@@ -165,6 +165,7 @@ fi
 
 log "verifying installed dependencies"
 run jq --version
+run gh --version
 run flock --version
 run tailscale version
 if [[ $DRY_RUN == true ]]; then
