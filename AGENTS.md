@@ -30,6 +30,16 @@ When the user reports that a Pull Request has been merged:
 - Pull the latest changes from `origin/main` using fast-forward only.
 - Confirm that the local `main` matches `origin/main`.
 
+## Workspace location
+
+When creating additional working data:
+
+- Create Git worktrees under `/home/takashi/work/worktrees/`.
+- Clone repositories under `/home/takashi/work/repos/`.
+- Create agent-managed temporary files and directories under `/home/takashi/work/tmp/`.
+- Do not create these resources outside `/home/takashi/work` unless the user explicitly requests another location or a tool requires a system-managed temporary location.
+- Before deleting temporary data, verify that the resolved target path is contained within `/home/takashi/work`.
+
 ## Commit policy
 
 When you create a Git commit:
