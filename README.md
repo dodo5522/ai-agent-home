@@ -95,6 +95,12 @@ systemctl --user enable --now herdr.service herdr-agents.service
 
 詳細は [`docs/HERDR-SYSTEMD-SETUP.md`](docs/HERDR-SYSTEMD-SETUP.md) を参照してください。
 
+### Herdr Skill
+
+Herdr 管理下の workspace、pane、Agent を Codex から安全に操作する手順は
+[`docs/HERDR-SKILL.md`](docs/HERDR-SKILL.md) を参照してください。upstream Skill の
+配置、発火条件、Agent の状態別対応、更新方法を記載しています。
+
 ## インストール確認
 
 ```bash
