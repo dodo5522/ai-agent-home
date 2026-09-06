@@ -37,10 +37,12 @@ test_dry_run_lists_every_install_phase() {
 
     assert_contains "$output" "apt-get install" "dry-run includes Ubuntu packages"
     assert_contains "$output" "util-linux" "dry-run includes flock provider"
+    assert_contains "$output" "git jq gh util-linux" "dry-run installs GitHub CLI"
     assert_contains "$output" "tailscale.com/install.sh" "dry-run includes Tailscale"
     assert_contains "$output" "mise.run" "dry-run includes mise"
     assert_contains "$output" "mise install" "dry-run includes configured tools"
     assert_contains "$output" "PyJWT[crypto]" "dry-run includes Python dependencies"
+    assert_contains "$output" "+ gh --version" "dry-run verifies GitHub CLI"
 }
 
 test_help_documents_non_mutating_mode() {

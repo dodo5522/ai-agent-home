@@ -17,7 +17,7 @@ Codex セッションを自動復旧するためのホームディレクトリ�
 [`install.sh`](install.sh) は次の依存関係をまとめてインストールします。
 
 - Ubuntu パッケージ: `build-essential`、`ca-certificates`、`curl`、`git`、
-  `jq`、`util-linux`（`flock` を含む）
+  `jq`、`gh`、`util-linux`（`flock` を含む）
 - Tailscale
 - mise
 - `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python
@@ -99,6 +99,7 @@ systemctl --user enable --now herdr.service herdr-agents.service
 
 ```bash
 jq --version
+gh --version
 flock --version
 tailscale version
 mise current
