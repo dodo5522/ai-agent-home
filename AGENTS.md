@@ -22,6 +22,14 @@ When review feedback is received:
 - Do not create a new Pull Request unless explicitly requested.
 - Do not merge the Pull Request.
 
+## After Pull Request merge
+
+When the user reports that a Pull Request has been merged:
+
+- Switch to `main`.
+- Pull the latest changes from `origin/main` using fast-forward only.
+- Confirm that the local `main` matches `origin/main`.
+
 ## Commit policy
 
 When you create a Git commit:
