@@ -20,7 +20,7 @@ Codex セッションを自動復旧するためのホームディレクトリ�
   `jq`、`gh`、`util-linux`（`flock` を含む）
 - Tailscale
 - mise
-- `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python
+- `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python、uv
 - `bin/github-app-token.py` が使用する Python パッケージ `PyJWT[crypto]`
 
 既に存在する Tailscale と mise は再インストールしません。`apt-get`、
@@ -101,6 +101,11 @@ Herdr 管理下の workspace、pane、Agent を Codex から安全に操作す�
 [`docs/HERDR-SKILL.md`](docs/HERDR-SKILL.md) を参照してください。upstream Skill の
 配置、発火条件、Agent の状態別対応、更新方法を記載しています。
 
+### Herdr タスク状態
+
+Issue 単位の安定したタスク識別子、状態ファイルのスキーマ、CLI の使い方と
+安全性の保証は [`docs/HERDR-TASK-STATE.md`](docs/HERDR-TASK-STATE.md) を参照してください。
+
 ## インストール確認
 
 ```bash
@@ -133,8 +138,17 @@ systemctl --user status herdr.service herdr-agents.service
 
 ## テスト
 
-インストーラの非破壊モードと CLI 契約は次のコマンドで検証できます。
+インストーラの非破壊モードと、インストール成果物のスモークテストは次のコマンドで検証できます。
 
 ```bash
 ./tests/install_test.sh
+uv run --project tools/herdr_task_state --group dev pytest
+uv run --project tools/herdr_task_state --group dev ruff format --check tools/herdr_task_state/src tools/herdr_task_state/tests
+uv run --project tools/herdr_task_state --group dev ruff check tools/herdr_task_state/src tools/herdr_task_state/tests
+```
+
+Herdr task-state CLIは、プロジェクトから`uvx`で実行できます。
+
+```bash
+uvx --from ./tools/herdr_task_state herdr-task-state validate
 ```
