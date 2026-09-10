@@ -9,6 +9,9 @@ HERDR_SKILL_DOC="$REPO_ROOT/docs/HERDR-SKILL.md"
 HERDR_TASK_STATE_CLI="$REPO_ROOT/bin/herdr-task-state"
 HERDR_TASK_STATE_PROJECT="$REPO_ROOT/tools/herdr_task_state/pyproject.toml"
 HERDR_TASK_STATE_DOC="$REPO_ROOT/docs/HERDR-TASK-STATE.md"
+HERDR_TASK_START_CLI="$REPO_ROOT/bin/herdr-task-start"
+HERDR_TASK_START_PROJECT="$REPO_ROOT/tools/herdr_task_start/pyproject.toml"
+HERDR_TASK_START_DOC="$REPO_ROOT/docs/HERDR-TASK-START.md"
 failures=0
 
 fail() {
@@ -215,6 +218,12 @@ test_herdr_task_state_contract_is_installed_and_documented() {
         fail "Herdr task-state uvx project metadata exists"
     fi
 
+    if [[ -f $HERDR_TASK_STATE_PROJECT ]] && ! grep -Fq 'herdr-task-start' "$HERDR_TASK_STATE_PROJECT"; then
+        pass "Herdr task-state project excludes task-start"
+    else
+        fail "Herdr task-state project excludes task-start"
+    fi
+
     readme=$(<"$REPO_ROOT/README.md")
     assert_contains "$readme" 'docs/HERDR-TASK-STATE.md' \
         "README links to the Herdr task-state operator reference"
@@ -239,6 +248,63 @@ test_herdr_task_state_contract_is_installed_and_documented() {
     assert_contains "$documentation" 'Secrets' "task-state reference prohibits secrets"
 }
 
+test_herdr_task_start_contract_is_installed_and_documented() {
+    local documentation
+    local readme
+    local output
+
+    if [[ -x $HERDR_TASK_START_CLI ]]; then
+        pass "Herdr task-start CLI exists and is executable"
+    else
+        fail "Herdr task-start CLI exists and is executable"
+    fi
+
+    if [[ -f $HERDR_TASK_START_PROJECT ]] && \
+        output=$(uvx --from "$REPO_ROOT/tools/herdr_task_start" herdr-task-start --help 2>&1) && \
+        [[ $output == *"usage: herdr-task-start"* ]]; then
+        pass "Herdr task-start package starts through uvx"
+    else
+        fail "Herdr task-start package starts through uvx"
+    fi
+
+    if [[ -f $HERDR_TASK_START_PROJECT ]] && \
+        grep -Fq 'herdr-task-start = "herdr_task_start.cli:main"' "$HERDR_TASK_START_PROJECT"; then
+        pass "Herdr task-start uvx project metadata exists"
+    else
+        fail "Herdr task-start uvx project metadata exists"
+    fi
+
+    if [[ -f $HERDR_TASK_START_PROJECT ]] && \
+        grep -Fq 'herdr-task-state' "$HERDR_TASK_START_PROJECT" && \
+        grep -Fq 'path = "../herdr_task_state"' "$HERDR_TASK_START_PROJECT"; then
+        pass "Herdr task-start project uses the task-state package"
+    else
+        fail "Herdr task-start project uses the task-state package"
+    fi
+
+    readme=$(<"$REPO_ROOT/README.md")
+    assert_contains "$readme" 'herdr-task-start 32' \
+        "README documents the Herdr task-start command"
+
+    if [[ -f $HERDR_TASK_START_DOC ]]; then
+        pass "Herdr task-start operator reference exists"
+    else
+        fail "Herdr task-start operator reference exists"
+        return
+    fi
+    documentation=$(<"$HERDR_TASK_START_DOC")
+    assert_contains "$documentation" 'HERDR_ENV=1' \
+        "task-start reference documents the task-start environment"
+    assert_contains "$documentation" '--no-focus' \
+        "task-start reference documents background resource creation"
+    assert_contains "$documentation" 'owner/name#issue-number' \
+        "task-start reference documents the task identity"
+    assert_contains "$documentation" 'unmanaged' \
+        "task-start reference documents unmanaged resource safety"
+    assert_contains "$documentation" 'read-only' \
+        "task-start reference documents read-only safety"
+}
+
 test_dry_run_lists_every_install_phase
 test_help_documents_non_mutating_mode
 test_unknown_option_fails
@@ -247,6 +313,7 @@ test_herdr_skill_is_installed_with_safety_contract
 test_herdr_skill_records_reproducible_upstream
 test_herdr_skill_setup_and_update_are_documented
 test_herdr_task_state_contract_is_installed_and_documented
+test_herdr_task_start_contract_is_installed_and_documented
 
 if ((failures > 0)); then
     printf '%d test(s) failed\n' "$failures" >&2

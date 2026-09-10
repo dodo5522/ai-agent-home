@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=75.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "herdr-task-start"
+version = "0.1.0"
+description = "Create or reuse Herdr resources when starting a GitHub Issue"
+requires-python = ">=3.14"
+dependencies = [
+    "herdr-task-state",
+]
+
+[project.scripts]
+herdr-task-start = "herdr_task_start.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.2",
+    "ruff==0.14.10",
+]
+
+[tool.uv.sources]
+herdr-task-state = { path = "../herdr_task_state" }
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "ANN"]

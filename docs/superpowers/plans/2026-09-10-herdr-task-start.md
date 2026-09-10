@@ -1,5 +1,11 @@
 # Herdr Task Start Reconciliation Implementation Plan
 
+> Implementation note: the initial plan below placed the start command in the
+> state project. During implementation it was split into the independent
+> `tools/herdr_task_start` project, which depends on the local
+> `tools/herdr_task_state` package. The final source, tests, and uvx commands
+> use that split layout.
+
 > For agentic workers: REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Add a herdr-task-start command that resolves a GitHub Issue, creates or reuses managed Herdr workspace/tab resources idempotently, and records runtime references in task state.
@@ -365,14 +371,16 @@ Generated-by: Codex"
 **Files:**
 - Test: tools/herdr_task_state/tests/test_herdr_task_state.py
 - Test: tools/herdr_task_state/tests/test_herdr_task_state_cli.py
-- Test: tools/herdr_task_state/tests/test_herdr_task_start.py
+- Test: tools/herdr_task_start/tests/test_herdr_task_start.py
 - Test: tests/herdr_task_state_test.sh
+- Test: tests/herdr_task_start_test.sh
 - Test: tests/install_test.sh
 
 - [ ] Step 1: Run the full Python suite.
 
 ~~~bash
-uv run --project tools/herdr_task_state --group dev pytest -q
+uv run --project tools/herdr_task_state --group dev pytest -q tools/herdr_task_state/tests
+uv run --project tools/herdr_task_start --group dev pytest -q tools/herdr_task_start/tests
 ~~~
 
 Expected: all existing and new tests pass.
@@ -382,12 +390,15 @@ Expected: all existing and new tests pass.
 ~~~bash
 uv run --project tools/herdr_task_state --group dev ruff format --check tools/herdr_task_state/src tools/herdr_task_state/tests
 uv run --project tools/herdr_task_state --group dev ruff check tools/herdr_task_state/src tools/herdr_task_state/tests
+uv run --project tools/herdr_task_start --group dev ruff format --check tools/herdr_task_start/src tools/herdr_task_start/tests
+uv run --project tools/herdr_task_start --group dev ruff check tools/herdr_task_start/src tools/herdr_task_start/tests
 ~~~
 
 - [ ] Step 3: Run shell and diff checks.
 
 ~~~bash
 bash tests/herdr_task_state_test.sh
+bash tests/herdr_task_start_test.sh
 bash tests/install_test.sh
 git diff --check
 ~~~

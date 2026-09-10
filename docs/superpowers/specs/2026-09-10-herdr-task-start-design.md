@@ -102,10 +102,11 @@ predated this invocation.
 
 ## Implementation boundaries
 
-The feature lives in the existing `tools/herdr_task_state` project so it can
-reuse the Pydantic models and `StateStore` without duplicating the schema. Add
-a focused reconciliation module and a `herdr-task-start` console entry point;
-keep `model.py` and `store.py` independent of GitHub and Herdr subprocesses.
+The feature lives in a separate `tools/herdr_task_start` project so the state
+management CLI and Issue-start orchestration have independent entry points.
+The start project depends on the local `tools/herdr_task_state` package to
+reuse the Pydantic models and `StateStore` without duplicating the schema.
+Keep `model.py` and `store.py` independent of GitHub and Herdr subprocesses.
 The `bin/herdr-task-start` script is a thin uv-managed launcher like the
 existing task-state wrapper.
 
