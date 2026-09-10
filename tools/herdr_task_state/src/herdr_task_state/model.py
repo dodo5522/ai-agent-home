@@ -43,6 +43,8 @@ AbsolutePath = Annotated[NonEmptyString, AfterValidator(_absolute_path)]
 
 @dataclass(frozen=True)
 class TaskKey:
+    """Stable repository and issue identifier for a task."""
+
     repository: str
     issue_number: int
 
@@ -51,6 +53,7 @@ class TaskKey:
 
     @classmethod
     def parse(cls, value: str) -> Self:
+        """Parse a stable task key into its repository and issue parts."""
         if not isinstance(value, str):
             raise StateValidationError("task key must be a string")
         match = _TASK_KEY_RE.fullmatch(value)
@@ -60,9 +63,12 @@ class TaskKey:
 
 
 class Model(BaseModel):
+    """Base Pydantic model with shared JSON serialization and parsing behavior."""
+
     model_config = ConfigDict(extra="allow", strict=True, allow_inf_nan=False)
 
     def to_json(self) -> str:
+        """Serialize this model to its public JSON representation."""
         return self.model_dump_json(indent=2, exclude_unset=True, ensure_ascii=False)
 
     @staticmethod
@@ -95,6 +101,8 @@ class Model(BaseModel):
 
 
 class AgentReference(Model):
+    """Reference data for an agent associated with a workstream."""
+
     name: NonEmptyString
     codex_session_id: NonEmptyString | None = None
 
@@ -107,6 +115,8 @@ class AgentReference(Model):
 
 
 class HerdrReference(Model):
+    """Reference data for the Herdr workspace associated with a task."""
+
     workspace_id: NonEmptyString | None = None
     workspace_label: NonEmptyString | None = None
 
@@ -119,6 +129,8 @@ class HerdrReference(Model):
 
 
 class Workstream(Model):
+    """State and Herdr resources associated with one task workstream."""
+
     tab_id: NonEmptyString | None = None
     tab_label: NonEmptyString | None = None
     worktree: AbsolutePath | None = None
@@ -163,6 +175,8 @@ class Workstream(Model):
 
 
 class Task(Model):
+    """Task metadata and its main or parallel workstreams."""
+
     repository: RepositoryName
     issue_number: PositiveInt
     title: NonEmptyString | None = None
@@ -188,11 +202,13 @@ class Task(Model):
         return self
 
     def assert_matches(self, task_key: TaskKey) -> None:
+        """Ensure this task's identity matches the supplied stable task key."""
         if self.repository != task_key.repository or self.issue_number != task_key.issue_number:
             raise StateValidationError("task repository and issue number must match its task key")
 
     @classmethod
     def parse(cls, task_key: str, payload: str) -> Self:
+        """Parse one task document and verify its identity against a task key."""
         task = cls._parse(payload)
         identity = TaskKey.parse(task_key)
         task.assert_matches(identity)
@@ -200,6 +216,8 @@ class Task(Model):
 
 
 class TaskState(Model):
+    """Versioned collection of validated tasks keyed by stable task identifiers."""
+
     version: Annotated[StrictInt, Field(ge=1, le=1)]
     tasks: dict[str, Task]
 
@@ -211,19 +229,23 @@ class TaskState(Model):
 
     @classmethod
     def parse(cls, payload: str) -> Self:
+        """Parse and validate a complete task-state JSON document."""
         return cls._parse(payload)
 
     def get_task(self, task_key: TaskKey) -> Task:
+        """Return the task identified by a stable task key."""
         try:
             return self.tasks[str(task_key)]
         except KeyError as error:
             raise KeyError(str(task_key)) from error
 
     def with_task(self, task_key: TaskKey, task: Task) -> Self:
+        """Return a state copy containing the supplied task."""
         task.assert_matches(task_key)
         return self.model_copy(update={"tasks": {**self.tasks, str(task_key): task}})
 
     def without_task(self, task_key: TaskKey) -> Self:
+        """Return a state copy without the supplied task, if present."""
         if str(task_key) not in self.tasks:
             return self
         remaining = {key: value for key, value in self.tasks.items() if key != str(task_key)}

@@ -66,6 +66,7 @@ def _read_task_file(path: Path, key: str) -> Task:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the task-state CLI and return its process exit code."""
     os.umask(0o077)
     parser = argparse.ArgumentParser(
         prog="herdr-task-state",

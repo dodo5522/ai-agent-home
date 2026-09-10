@@ -17,6 +17,8 @@ from .model import (
 
 
 class StateFilesystemError(RuntimeError):
+    """Raised when task-state storage cannot perform a filesystem operation."""
+
     pass
 
 
@@ -70,6 +72,8 @@ class StateFileLock:
 
 
 class StateStore:
+    """Filesystem-backed storage for validated Herdr task state."""
+
     def __init__(self, path: Path) -> None:
         if not path.is_absolute():
             raise StateFilesystemError(f"state path must be absolute: {path}")
@@ -127,6 +131,7 @@ class StateStore:
                     pass
 
     def init(self) -> None:
+        """Create or validate the state file without overwriting valid data."""
         with self._state_lock.locked():
             try:
                 st = self.path.lstat()
@@ -144,9 +149,11 @@ class StateStore:
                 raise StateFilesystemError(f"cannot secure state file: {self.path}") from exc
 
     def read(self) -> TaskState:
+        """Read and validate the complete state document."""
         return self._read()
 
     def get(self, task_key: str) -> Task:
+        """Return one task by its stable task key."""
         key = TaskKey.parse(task_key)
         document = self._read()
         try:
@@ -155,6 +162,7 @@ class StateStore:
             raise KeyError(task_key) from error
 
     def put(self, task_key: str, task: Task) -> Task:
+        """Validate and atomically store one task under its stable key."""
         key = TaskKey.parse(task_key)
         task.assert_matches(key)
 
@@ -167,6 +175,7 @@ class StateStore:
             return task
 
     def remove(self, task_key: str) -> TaskState:
+        """Remove one task and return the resulting validated state."""
         key = TaskKey.parse(task_key)
 
         with self._state_lock.locked():
