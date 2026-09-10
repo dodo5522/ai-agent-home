@@ -77,3 +77,17 @@ Generated-by: Codex
 - Never commit secrets, tokens, private keys, `.pem` files, or credentials.
 - Do not embed GitHub access tokens in Git remote URLs.
 - Use the configured Git credential helper or GitHub App authentication.
+
+## Implementation language and dependency policy
+
+When adding a tool or automation with non-trivial logic:
+
+- Implement it in the Python version managed by mise and declared in `.config/mise/config.toml`.
+- Keep shell scripts limited to simple orchestration, argument/environment setup, or thin wrappers around Python tools.
+- Prefer Python standard-library modules whenever they are sufficient.
+- If a well-established third-party package materially reduces the implementation, manage it with `uv`, pin exact dependency versions, and commit the resulting project metadata and lockfile.
+- Install and manage `uv` through mise; keep its version pinned in `.config/mise/config.toml` (the current approved pin is `0.12.11`).
+- Do not install project dependencies ad hoc with a system `pip`; use the mise-managed Python and the repository's documented `uv` workflow.
+- Make Python tools directly runnable with `uvx` (or the equivalent `uv run` project command).
+- Use pytest for tests, shared setup through fixtures, and Ruff for formatting and linting.
+- Keep each tool's runtime and development dependencies in that tool's own `pyproject.toml` and `uv.lock` under `tools/<tool-name>/`.

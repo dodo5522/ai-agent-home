@@ -6,6 +6,9 @@ INSTALLER="$REPO_ROOT/install.sh"
 HERDR_SKILL="$REPO_ROOT/.codex/skills/herdr/SKILL.md"
 HERDR_SKILL_PROVENANCE="$REPO_ROOT/.codex/skills/herdr/UPSTREAM.md"
 HERDR_SKILL_DOC="$REPO_ROOT/docs/HERDR-SKILL.md"
+HERDR_TASK_STATE_CLI="$REPO_ROOT/bin/herdr-task-state"
+HERDR_TASK_STATE_PROJECT="$REPO_ROOT/tools/herdr_task_state/pyproject.toml"
+HERDR_TASK_STATE_DOC="$REPO_ROOT/docs/HERDR-TASK-STATE.md"
 failures=0
 
 fail() {
@@ -189,6 +192,53 @@ test_herdr_skill_setup_and_update_are_documented() {
     assert_contains "$documentation" '#17' "setup documents related notification work"
 }
 
+test_herdr_task_state_contract_is_installed_and_documented() {
+    local documentation readme
+
+    if [[ -x $HERDR_TASK_STATE_CLI ]]; then
+        pass "Herdr task-state CLI exists and is executable"
+    else
+        fail "Herdr task-state CLI exists and is executable"
+    fi
+
+    if [[ -f $HERDR_TASK_STATE_PROJECT ]] && \
+        output=$(uvx --from "$REPO_ROOT/tools/herdr_task_state" herdr-task-state --help 2>&1) && \
+        [[ $output == *"usage: herdr-task-state"* ]]; then
+        pass "Herdr task-state package starts through uvx"
+    else
+        fail "Herdr task-state package starts through uvx"
+    fi
+
+    if [[ -f $HERDR_TASK_STATE_PROJECT ]] && grep -Fq 'herdr-task-state = "herdr_task_state.cli:main"' "$HERDR_TASK_STATE_PROJECT"; then
+        pass "Herdr task-state uvx project metadata exists"
+    else
+        fail "Herdr task-state uvx project metadata exists"
+    fi
+
+    readme=$(<"$REPO_ROOT/README.md")
+    assert_contains "$readme" 'docs/HERDR-TASK-STATE.md' \
+        "README links to the Herdr task-state operator reference"
+
+    if [[ ! -f $HERDR_TASK_STATE_DOC ]]; then
+        fail "Herdr task-state operator reference exists"
+        return
+    fi
+    pass "Herdr task-state operator reference exists"
+    documentation=$(<"$HERDR_TASK_STATE_DOC")
+
+    assert_contains "$documentation" '${XDG_STATE_HOME:-$HOME/.local/state}/ai-agent-home/herdr-tasks.json' \
+        "task-state reference documents the default state path"
+    assert_contains "$documentation" 'version' "task-state reference documents the version field"
+    assert_contains "$documentation" '`init` succeeds silently' \
+        "task-state reference documents silent init"
+    assert_contains "$documentation" '`validate`' "task-state reference documents validate"
+    assert_contains "$documentation" '`get`' "task-state reference documents get"
+    assert_contains "$documentation" '`put`' "task-state reference documents put"
+    assert_contains "$documentation" '`remove`' "task-state reference documents remove"
+    assert_contains "$documentation" 'Exit status' "task-state reference documents exit statuses"
+    assert_contains "$documentation" 'Secrets' "task-state reference prohibits secrets"
+}
+
 test_dry_run_lists_every_install_phase
 test_help_documents_non_mutating_mode
 test_unknown_option_fails
@@ -196,6 +246,7 @@ test_runtime_paths_use_mise_shims
 test_herdr_skill_is_installed_with_safety_contract
 test_herdr_skill_records_reproducible_upstream
 test_herdr_skill_setup_and_update_are_documented
+test_herdr_task_state_contract_is_installed_and_documented
 
 if ((failures > 0)); then
     printf '%d test(s) failed\n' "$failures" >&2
