@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+UV_BIN=${UV_BIN:-/home/takashi/.local/share/mise/shims/uv}
+exec "$UV_BIN" run --project "$SCRIPT_DIR/../tools/herdr_task_start" herdr-task-start "$@"

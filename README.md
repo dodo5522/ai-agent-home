@@ -106,6 +106,15 @@ Herdr 管理下の workspace、pane、Agent を Codex から安全に操作す�
 Issue 単位の安定したタスク識別子、状態ファイルのスキーマ、CLI の使い方と
 安全性の保証は [`docs/HERDR-TASK-STATE.md`](docs/HERDR-TASK-STATE.md) を参照してください。
 
+Issue対応開始時のWorkspace / Tab / paneの再構成は
+[`docs/HERDR-TASK-START.md`](docs/HERDR-TASK-START.md) を参照してください。
+
+Issue 対応を開始するときは、Herdr の Space / Tab を解決して状態へ記録します。
+
+```bash
+uvx --from ./tools/herdr_task_start herdr-task-start 32
+```
+
 ## インストール確認
 
 ```bash
@@ -142,13 +151,17 @@ systemctl --user status herdr.service herdr-agents.service
 
 ```bash
 ./tests/install_test.sh
-uv run --project tools/herdr_task_state --group dev pytest
+uv run --project tools/herdr_task_state --group dev pytest tools/herdr_task_state/tests
 uv run --project tools/herdr_task_state --group dev ruff format --check tools/herdr_task_state/src tools/herdr_task_state/tests
 uv run --project tools/herdr_task_state --group dev ruff check tools/herdr_task_state/src tools/herdr_task_state/tests
+uv run --project tools/herdr_task_start --group dev pytest tools/herdr_task_start/tests
+uv run --project tools/herdr_task_start --group dev ruff format --check tools/herdr_task_start/src tools/herdr_task_start/tests
+uv run --project tools/herdr_task_start --group dev ruff check tools/herdr_task_start/src tools/herdr_task_start/tests
 ```
 
-Herdr task-state CLIは、プロジェクトから`uvx`で実行できます。
+Herdr task-state CLIとIssue開始CLIは、それぞれ独立したプロジェクトとして`uvx`で実行できます。
 
 ```bash
 uvx --from ./tools/herdr_task_state herdr-task-state validate
+uvx --from ./tools/herdr_task_start herdr-task-start 32
 ```
