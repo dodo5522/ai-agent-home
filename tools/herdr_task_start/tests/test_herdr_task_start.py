@@ -7,20 +7,20 @@ import pytest
 from herdr_task_state.model import HerdrReference, Task, TaskState, Workstream
 from herdr_task_state.store import StateStore
 
+from herdr_task_start import TaskStarter, TaskStartError
 from herdr_task_start.cli import main as start_main
-from herdr_task_start.start import (
-    CommandResult,
+from herdr_task_start.herdr import (
     CreatedResources,
     HerdrClient,
     PaneInfo,
     TabInfo,
-    TaskStarter,
-    TaskStartError,
-    TaskStartResolution,
     WorkspaceInfo,
-    load_issue_title,
-    resolve_repository,
-    short_title,
+    _HerdrOperations,
+)
+from herdr_task_start.identity import load_issue_title, resolve_repository, short_title
+from herdr_task_start.runner import CommandResult
+from herdr_task_start.start import (
+    TaskStartResolution,
 )
 
 
@@ -42,7 +42,7 @@ class StubRunner:
 
 
 @dataclass
-class FakeHerdr:
+class FakeHerdr(_HerdrOperations):
     calls: list[tuple[str, ...]] = field(default_factory=list)
     workspaces: dict[str, WorkspaceInfo] = field(default_factory=dict)
     tabs: dict[str, TabInfo] = field(default_factory=dict)
@@ -110,6 +110,11 @@ class FakeHerdr:
 
     def set_panes(self, tab_id: str, pane_ids: Sequence[str]) -> None:
         self.panes[tab_id] = [PaneInfo(pane_id, tab_id) for pane_id in pane_ids]
+
+
+def test_herdr_implementations_explicitly_extend_operations_protocol() -> None:
+    assert _HerdrOperations in HerdrClient.__bases__
+    assert _HerdrOperations in FakeHerdr.__bases__
 
 
 @dataclass

@@ -10,7 +10,7 @@
 
 **Goal:** Add a herdr-task-start command that resolves a GitHub Issue, creates or reuses managed Herdr workspace/tab resources idempotently, and records runtime references in task state.
 
-**Architecture:** Keep model.py and store.py independent of external commands. Add a typed start.py reconciliation module and start_cli.py entry point inside the existing tools/herdr_task_state project; bin/herdr-task-start remains a thin uv launcher. Persist state only after all resource checks succeed and use state-stored IDs as ownership proof.
+**Architecture:** Keep `herdr_task_state` independent of external commands. In the separate `herdr_task_start` package, `start.py` owns reconciliation, `herdr.py` owns the typed Herdr adapter, `identity.py` resolves Git/GitHub identity, and `runner.py` owns subprocess execution. `cli.py` remains a thin command entry point. Persist state only after all resource checks succeed and use state-stored IDs as ownership proof.
 
 **Tech Stack:** Python 3.14.7 from mise, Pydantic 2.12.5, Python standard library (argparse, dataclasses, json, pathlib, re, subprocess), pytest 8.4.2, Ruff 0.14.10, Herdr CLI 0.8.2, GitHub CLI gh.
 
@@ -19,7 +19,7 @@
 ## Global Constraints
 
 - Complex logic uses mise-managed Python; Bash is only a thin launcher.
-- The command is runnable with uvx --from ./tools/herdr_task_state herdr-task-start.
+- The command is runnable with uvx --from ./tools/herdr_task_start herdr-task-start.
 - Keep the existing exact Pydantic/pytest/Ruff pins and use no new runtime dependency.
 - Require HERDR_ENV=1 and use current cwd unless --cwd is supplied.
 - Normalize GitHub identity to lower-case owner/name and use owner/name#issue-number as the stable key.

@@ -10,7 +10,8 @@ from herdr_task_state.cli import ExitCode
 from herdr_task_state.model import StateValidationError
 from herdr_task_state.store import StateFilesystemError
 
-from herdr_task_start.start import TaskStarter, TaskStartError
+from herdr_task_start.errors import TaskStartError
+from herdr_task_start.start import TaskStarter
 
 
 def _state_path() -> Path:

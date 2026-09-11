@@ -1,37 +1,10 @@
-"""Issue-start orchestration for Herdr-managed task resources."""
+"""Public API for Herdr-managed Issue task startup."""
 
-from .start import (
-    CommandResult,
-    CommandRunner,
-    CreatedResources,
-    HerdrClient,
-    HerdrOperations,
-    PaneInfo,
-    SubprocessRunner,
-    TabInfo,
-    TaskStarter,
-    TaskStartError,
-    TaskStartResolution,
-    WorkspaceInfo,
-    load_issue_title,
-    resolve_repository,
-    short_title,
-)
+from .errors import TaskStartError
+from .start import TaskStarter, TaskStartResolution
 
 __all__ = [
-    "CommandResult",
-    "CommandRunner",
-    "CreatedResources",
-    "HerdrClient",
-    "HerdrOperations",
-    "PaneInfo",
-    "SubprocessRunner",
-    "TabInfo",
-    "TaskStartResolution",
     "TaskStarter",
     "TaskStartError",
-    "WorkspaceInfo",
-    "load_issue_title",
-    "resolve_repository",
-    "short_title",
+    "TaskStartResolution",
 ]

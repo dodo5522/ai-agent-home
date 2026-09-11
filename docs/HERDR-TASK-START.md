@@ -22,6 +22,20 @@ uvx --from ./tools/herdr_task_start herdr-task-start 32
 GitHub CLIから `owner/name#issue-number` とIssueタイトルを解決します。Workspace labelは
 `owner/name`、Tab labelはIssue番号と短縮タイトルです。
 
+## パッケージ構成
+
+| Module | 責務 |
+| --- | --- |
+| `cli.py` | 引数の解析、標準出力・標準エラー、終了コードの変換。 |
+| `start.py` | `TaskStarter`によるIssue開始時の再構成フロー。 |
+| `herdr.py` | Herdr CLIのJSONアダプタと、再構成に必要な内部操作Protocol。 |
+| `identity.py` | Git originとGitHub Issueからの識別子・表示名の解決。 |
+| `runner.py` | 外部コマンド実行の境界。 |
+| `errors.py` | task-start固有の例外。 |
+
+package rootから公開するのは `TaskStarter`、`TaskStartResolution`、`TaskStartError` のみです。
+Herdrアダプタと内部Protocolは外部拡張用のAPIではありません。
+
 ## 安全な再構成
 
 作成・再利用の対象はstateに保存されたHerdr IDからのみ判定します。labelだけが一致する
