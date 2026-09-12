@@ -1,6 +1,7 @@
 """Read-only cleanup planning for stored Herdr task resources."""
 
 import json
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
@@ -57,6 +58,22 @@ def _targets(values: list[str]) -> str:
     return json.dumps(values, ensure_ascii=False)
 
 
+def _git_markers(root: Path) -> list[Path]:
+    """Find Git markers without following symlinks or suppressing traversal errors."""
+    markers: list[Path] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                path = Path(entry.path)
+                if entry.name == ".git":
+                    markers.append(path)
+                elif entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+    return markers
+
+
 class CleanupPlanner:
     """Validate state-recorded cleanup targets without mutating any resource."""
 
@@ -109,6 +126,14 @@ class CleanupPlanner:
         try:
             workspace = self._herdr.workspace_find(task.herdr.workspace_id)
             if workspace is None:
+                for tab_id, _ in self._stored_tabs(task):
+                    if self._herdr.tab_find(tab_id) is not None:
+                        return CleanupActionPlan(
+                            "tab",
+                            "blocked",
+                            target,
+                            "stored workspace is absent but a stored Tab remains live",
+                        )
                 return CleanupActionPlan(
                     "tab", "already_absent", target, "stored workspace is no longer live"
                 )
@@ -312,8 +337,8 @@ class CleanupPlanner:
         try:
             unmanaged_git_markers = [
                 marker
-                for marker in root.rglob(".git")
-                if not any(marker.is_relative_to(worktree) for worktree in stored)
+                for marker in _git_markers(root)
+                if marker.parent.resolve(strict=False) not in stored
             ]
         except OSError:
             return CleanupActionPlan(

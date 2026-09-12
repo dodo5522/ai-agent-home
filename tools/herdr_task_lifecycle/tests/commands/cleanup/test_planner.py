@@ -1,4 +1,5 @@
 import json
+import os
 from collections.abc import Mapping, Sequence
 from dataclasses import FrozenInstanceError, dataclass, field
 from pathlib import Path
@@ -266,6 +267,21 @@ def test_plan_reports_missing_stored_tab_as_already_absent(
     assert action.target == "w9:t33"
 
 
+def test_plan_blocks_live_stored_tab_when_workspace_is_missing(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    cleanup_fixture.herdr.workspaces.clear()
+
+    action = cleanup_fixture.planner.plan(cleanup_fixture.task_key).actions[0]
+
+    assert action.outcome == "blocked"
+    assert "Tab remains live" in action.reason
+    assert cleanup_fixture.herdr.lookup_calls == [
+        ("workspace", "w9"),
+        ("tab", "w9:t33"),
+    ]
+
+
 @pytest.mark.parametrize(
     ("workspace", "tab", "reason"),
     [
@@ -374,6 +390,43 @@ def test_plan_blocks_task_root_with_a_foreign_git_worktree(
 
     assert action.outcome == "blocked"
     assert "unmanaged Git worktree" in action.reason
+
+
+def test_plan_blocks_nested_git_marker_inside_stored_worktree(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    (cleanup_fixture.worktree / ".git").write_text(
+        "gitdir: /tmp/managed/worktrees/task\n", encoding="utf-8"
+    )
+    nested = cleanup_fixture.worktree / "nested-worktree"
+    nested.mkdir()
+    (nested / ".git").write_text("gitdir: /tmp/foreign/worktrees/task\n", encoding="utf-8")
+
+    action = cleanup_fixture.planner.plan(cleanup_fixture.task_key).actions[2]
+
+    assert action.outcome == "blocked"
+    assert "unmanaged Git worktree" in action.reason
+
+
+def test_plan_blocks_when_task_root_traversal_fails(
+    cleanup_fixture: CleanupFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unreadable = cleanup_fixture.task_root / "unreadable"
+    unreadable.mkdir()
+    real_scandir = os.scandir
+
+    def failing_scandir(path: str | bytes | int | Path) -> os.ScandirIterator[str]:
+        if Path(path) == unreadable:
+            raise PermissionError("test traversal denial")
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", failing_scandir)
+
+    action = cleanup_fixture.planner.plan(cleanup_fixture.task_key).actions[2]
+
+    assert action.outcome == "blocked"
+    assert "could not be scanned" in action.reason
 
 
 def test_plan_requires_a_task_root_marker_for_every_stored_worktree(
