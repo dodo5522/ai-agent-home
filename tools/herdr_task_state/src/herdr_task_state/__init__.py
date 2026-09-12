@@ -2,6 +2,8 @@
 
 from .model import (
     AgentReference,
+    CleanupAction,
+    CleanupProgress,
     HerdrReference,
     Model,
     StateValidationError,
@@ -13,6 +15,8 @@ from .model import (
 
 __all__ = [
     "AgentReference",
+    "CleanupAction",
+    "CleanupProgress",
     "HerdrReference",
     "Model",
     "StateValidationError",

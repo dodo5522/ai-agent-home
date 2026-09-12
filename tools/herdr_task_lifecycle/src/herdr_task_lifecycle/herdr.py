@@ -1,4 +1,4 @@
-"""Typed Herdr CLI adapter for task startup."""
+"""Typed Herdr CLI adapter for task lifecycle operations."""
 
 import json
 from collections.abc import Mapping, Sequence
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
-from .errors import TaskStartError
+from .errors import LifecycleError
 from .runner import CommandRunner
 
 
@@ -72,7 +72,17 @@ class _HerdrOperations(Protocol):
         """List panes belonging to one tab."""
 
 
-class HerdrClient(_HerdrOperations):
+class _HerdrPlanningOperations(Protocol):
+    """Read-only Herdr operations required by cleanup planning."""
+
+    def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
+        """Return the exact live workspace, or None when it is absent."""
+
+    def tab_find(self, tab_id: str) -> TabInfo | None:
+        """Return the exact live tab, or None when it is absent."""
+
+
+class HerdrClient(_HerdrOperations, _HerdrPlanningOperations):
     """Typed adapter for the Herdr JSON CLI interface."""
 
     def __init__(self, runner: CommandRunner) -> None:
@@ -81,30 +91,30 @@ class HerdrClient(_HerdrOperations):
     def _request(self, arguments: Sequence[str]) -> Mapping[str, object]:
         result = self._runner.run(["herdr", *arguments])
         if result.returncode != 0:
-            raise TaskStartError(f"Herdr command failed: {arguments[0]}")
+            raise LifecycleError(f"Herdr command failed: {arguments[0]}")
         try:
             document = json.loads(result.stdout)
         except json.JSONDecodeError as error:
-            raise TaskStartError("Herdr response is invalid JSON") from error
+            raise LifecycleError("Herdr response is invalid JSON") from error
         if not isinstance(document, dict):
-            raise TaskStartError("Herdr response is not an object")
+            raise LifecycleError("Herdr response is not an object")
         payload = document.get("result")
         if not isinstance(payload, dict):
-            raise TaskStartError("Herdr response has no result object")
+            raise LifecycleError("Herdr response has no result object")
         return cast(Mapping[str, object], payload)
 
     @staticmethod
     def _member(payload: Mapping[str, object], name: str) -> Mapping[str, object]:
         value = payload.get(name)
         if not isinstance(value, dict):
-            raise TaskStartError(f"Herdr response has no {name} object")
+            raise LifecycleError(f"Herdr response has no {name} object")
         return cast(Mapping[str, object], value)
 
     @staticmethod
     def _string(payload: Mapping[str, object], name: str) -> str:
         value = payload.get(name)
         if not isinstance(value, str) or not value:
-            raise TaskStartError(f"Herdr response has no {name}")
+            raise LifecycleError(f"Herdr response has no {name}")
         return value
 
     def workspace_get(self, workspace_id: str) -> WorkspaceInfo:
@@ -112,8 +122,23 @@ class HerdrClient(_HerdrOperations):
         workspace = self._member(self._request(["workspace", "get", workspace_id]), "workspace")
         actual_id = self._string(workspace, "workspace_id")
         if actual_id != workspace_id:
-            raise TaskStartError("Herdr workspace identity mismatch")
+            raise LifecycleError("Herdr workspace identity mismatch")
         return WorkspaceInfo(actual_id, self._string(workspace, "label"))
+
+    def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
+        """Find one workspace by opaque ID without inferring ownership from labels."""
+        payload = self._request(["workspace", "list"])
+        raw_workspaces = payload.get("workspaces")
+        if not isinstance(raw_workspaces, list):
+            raise LifecycleError("Herdr response has no workspaces list")
+        for raw_workspace in raw_workspaces:
+            if not isinstance(raw_workspace, dict):
+                raise LifecycleError("Herdr workspace response contains an invalid workspace")
+            workspace = cast(Mapping[str, object], raw_workspace)
+            actual_id = self._string(workspace, "workspace_id")
+            if actual_id == workspace_id:
+                return WorkspaceInfo(actual_id, self._string(workspace, "label"))
+        return None
 
     def workspace_create(self, label: str, cwd: Path) -> CreatedResources:
         """Create a background workspace and return its opaque resource IDs."""
@@ -130,7 +155,7 @@ class HerdrClient(_HerdrOperations):
             self._string(tab, "workspace_id") != workspace_id
             or self._string(pane, "tab_id") != tab_id
         ):
-            raise TaskStartError("Herdr create response has inconsistent resource identities")
+            raise LifecycleError("Herdr create response has inconsistent resource identities")
         return CreatedResources(workspace_id, tab_id, pane_id)
 
     def workspace_close(self, workspace_id: str) -> None:
@@ -142,8 +167,27 @@ class HerdrClient(_HerdrOperations):
         tab = self._member(self._request(["tab", "get", tab_id]), "tab")
         actual_id = self._string(tab, "tab_id")
         if actual_id != tab_id:
-            raise TaskStartError("Herdr tab identity mismatch")
+            raise LifecycleError("Herdr tab identity mismatch")
         return TabInfo(actual_id, self._string(tab, "workspace_id"), self._string(tab, "label"))
+
+    def tab_find(self, tab_id: str) -> TabInfo | None:
+        """Find one tab by opaque ID without inferring ownership from labels."""
+        payload = self._request(["tab", "list"])
+        raw_tabs = payload.get("tabs")
+        if not isinstance(raw_tabs, list):
+            raise LifecycleError("Herdr response has no tabs list")
+        for raw_tab in raw_tabs:
+            if not isinstance(raw_tab, dict):
+                raise LifecycleError("Herdr tab response contains an invalid tab")
+            tab = cast(Mapping[str, object], raw_tab)
+            actual_id = self._string(tab, "tab_id")
+            if actual_id == tab_id:
+                return TabInfo(
+                    actual_id,
+                    self._string(tab, "workspace_id"),
+                    self._string(tab, "label"),
+                )
+        return None
 
     def tab_create(self, workspace_id: str, label: str, cwd: Path) -> CreatedResources:
         """Create a background tab with one root pane."""
@@ -168,7 +212,7 @@ class HerdrClient(_HerdrOperations):
             self._string(tab, "workspace_id") != workspace_id
             or self._string(pane, "tab_id") != tab_id
         ):
-            raise TaskStartError("Herdr create response has inconsistent resource identities")
+            raise LifecycleError("Herdr create response has inconsistent resource identities")
         return CreatedResources(workspace_id, tab_id, pane_id)
 
     def tab_rename(self, tab_id: str, label: str) -> TabInfo:
@@ -176,7 +220,7 @@ class HerdrClient(_HerdrOperations):
         tab = self._member(self._request(["tab", "rename", tab_id, label]), "tab")
         actual_id = self._string(tab, "tab_id")
         if actual_id != tab_id or self._string(tab, "label") != label:
-            raise TaskStartError("Herdr tab rename response has inconsistent identity")
+            raise LifecycleError("Herdr tab rename response has inconsistent identity")
         return TabInfo(actual_id, self._string(tab, "workspace_id"), label)
 
     def tab_close(self, tab_id: str) -> None:
@@ -188,11 +232,11 @@ class HerdrClient(_HerdrOperations):
         payload = self._request(["pane", "list", "--workspace", workspace_id])
         raw_panes = payload.get("panes")
         if not isinstance(raw_panes, list):
-            raise TaskStartError("Herdr response has no panes list")
+            raise LifecycleError("Herdr response has no panes list")
         panes: list[PaneInfo] = []
         for raw_pane in raw_panes:
             if not isinstance(raw_pane, dict):
-                raise TaskStartError("Herdr pane response contains an invalid pane")
+                raise LifecycleError("Herdr pane response contains an invalid pane")
             pane = cast(Mapping[str, object], raw_pane)
             pane_info = PaneInfo(self._string(pane, "pane_id"), self._string(pane, "tab_id"))
             if pane_info.tab_id == tab_id:

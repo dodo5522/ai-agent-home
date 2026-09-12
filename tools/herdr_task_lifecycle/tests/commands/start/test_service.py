@@ -1,5 +1,5 @@
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -7,9 +7,10 @@ import pytest
 from herdr_task_state.model import HerdrReference, Task, TaskState, Workstream
 from herdr_task_state.store import StateStore
 
-from herdr_task_start import TaskStarter, TaskStartError
-from herdr_task_start.cli import main as start_main
-from herdr_task_start.herdr import (
+from herdr_task_lifecycle.cli import main as lifecycle_main
+from herdr_task_lifecycle.commands.start.service import TaskStarter, TaskStartResolution
+from herdr_task_lifecycle.errors import LifecycleError
+from herdr_task_lifecycle.herdr import (
     CreatedResources,
     HerdrClient,
     PaneInfo,
@@ -17,21 +18,33 @@ from herdr_task_start.herdr import (
     WorkspaceInfo,
     _HerdrOperations,
 )
-from herdr_task_start.identity import load_issue_title, resolve_repository, short_title
-from herdr_task_start.runner import CommandResult
-from herdr_task_start.start import (
-    TaskStartResolution,
-)
+from herdr_task_lifecycle.identity import load_issue_title, resolve_repository, short_title
+from herdr_task_lifecycle.runner import CommandResult
 
 
 @dataclass
-class StubRunner:
+class RecordingRunner:
+    token: str | None = "test-installation-token"
     responses: dict[tuple[str, ...], CommandResult] = field(default_factory=dict)
-    calls: list[tuple[tuple[str, ...], Path | None]] = field(default_factory=list)
+    calls: list[tuple[tuple[str, ...], Path | None, Mapping[str, str] | None]] = field(
+        default_factory=list
+    )
+    gh_environment: dict[str, str] | None = None
 
-    def run(self, arguments: Sequence[str], cwd: Path | None = None) -> CommandResult:
+    def run(
+        self,
+        arguments: Sequence[str],
+        cwd: Path | None = None,
+        environment: Mapping[str, str] | None = None,
+    ) -> CommandResult:
         command = tuple(arguments)
-        self.calls.append((command, cwd))
+        self.calls.append((command, cwd, environment))
+        if Path(command[0]).name == "get-github-app-token.py":
+            if self.token is None:
+                return CommandResult(1, "", "token generation failed")
+            return CommandResult(0, f"{self.token}\n", "")
+        if command[:3] == ("gh", "issue", "view"):
+            self.gh_environment = dict(environment or {})
         try:
             return self.responses[command]
         except KeyError as error:
@@ -39,6 +52,27 @@ class StubRunner:
 
     def respond(self, arguments: Sequence[str], result: CommandResult) -> None:
         self.responses[tuple(arguments)] = result
+
+    def respond_to_issue_lookup(
+        self,
+        *,
+        returncode: int,
+        stdout: str = "",
+        stderr: str = "",
+    ) -> None:
+        self.respond(
+            [
+                "gh",
+                "issue",
+                "view",
+                "33",
+                "--repo",
+                "dodo5522/ai-agent-home",
+                "--json",
+                "title",
+            ],
+            CommandResult(returncode, stdout, stderr),
+        )
 
 
 @dataclass
@@ -57,12 +91,12 @@ class FakeHerdr(_HerdrOperations):
         try:
             return self.workspaces[workspace_id]
         except KeyError as error:
-            raise TaskStartError("workspace is stale") from error
+            raise LifecycleError("workspace is stale") from error
 
     def workspace_create(self, label: str, cwd: Path) -> CreatedResources:
         self.calls.append(("workspace", "create", label, str(cwd), "--no-focus"))
         if self.fail_create:
-            raise TaskStartError("workspace create failed")
+            raise LifecycleError("workspace create failed")
         created = self.next_workspace
         self.workspaces[created.workspace_id] = WorkspaceInfo(created.workspace_id, label)
         self.tabs[created.tab_id] = TabInfo(created.tab_id, created.workspace_id, "1")
@@ -77,7 +111,7 @@ class FakeHerdr(_HerdrOperations):
         try:
             return self.tabs[tab_id]
         except KeyError as error:
-            raise TaskStartError("tab is stale") from error
+            raise LifecycleError("tab is stale") from error
 
     def tab_create(self, workspace_id: str, label: str, cwd: Path) -> CreatedResources:
         self.calls.append(("tab", "create", workspace_id, label, str(cwd), "--no-focus"))
@@ -89,7 +123,7 @@ class FakeHerdr(_HerdrOperations):
     def tab_rename(self, tab_id: str, label: str) -> TabInfo:
         self.calls.append(("tab", "rename", tab_id, label))
         if self.fail_rename:
-            raise TaskStartError("tab rename failed")
+            raise LifecycleError("tab rename failed")
         current = self.tabs[tab_id]
         renamed = TabInfo(tab_id, current.workspace_id, label)
         self.tabs[tab_id] = renamed
@@ -120,7 +154,7 @@ def test_herdr_implementations_explicitly_extend_operations_protocol() -> None:
 @dataclass
 class StartFixture:
     tmp_path: Path
-    runner: StubRunner
+    runner: RecordingRunner
     herdr: FakeHerdr
     state_path: Path
 
@@ -163,7 +197,7 @@ class StartFixture:
 @pytest.fixture
 def start_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> StartFixture:
     monkeypatch.setenv("HERDR_ENV", "1")
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["git", "-C", str(tmp_path), "remote", "get-url", "origin"],
         CommandResult(0, "git@github.com:Dodo5522/Ai-Agent-Home.git\n", ""),
@@ -180,7 +214,7 @@ def test_resolve_repository_accepts_https_and_ssh_remotes() -> None:
         "https://github.com/Dodo5522/Ai-Agent-Home.git",
         "git@github.com:Dodo5522/Ai-Agent-Home.git",
     ):
-        runner = StubRunner()
+        runner = RecordingRunner()
         runner.respond(
             ["git", "-C", "/tmp/repo", "remote", "get-url", "origin"],
             CommandResult(0, remote + "\n", ""),
@@ -190,13 +224,44 @@ def test_resolve_repository_accepts_https_and_ssh_remotes() -> None:
 
 
 def test_load_issue_title_uses_repository_and_json() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["gh", "issue", "view", "32", "--repo", "dodo5522/ai-agent-home", "--json", "title"],
         CommandResult(0, json.dumps({"title": "  Herdr   task-start  "}), ""),
     )
 
     assert load_issue_title("dodo5522/ai-agent-home", 32, runner) == "  Herdr   task-start  "
+
+
+def test_issue_lookup_uses_github_app_token_without_echoing_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    runner = RecordingRunner(token="test-installation-token")
+    runner.respond_to_issue_lookup(returncode=1, stderr="authentication failed")
+
+    with pytest.raises(LifecycleError, match="cannot load GitHub Issue title") as error:
+        load_issue_title("dodo5522/ai-agent-home", 33, runner)
+
+    assert runner.gh_environment is not None
+    assert runner.gh_environment["GH_TOKEN"] == "test-installation-token"
+    assert "test-installation-token" not in str(error.value)
+
+
+def test_issue_lookup_preserves_caller_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GH_TOKEN", "caller-token")
+    runner = RecordingRunner(token=None)
+    runner.respond_to_issue_lookup(
+        returncode=0,
+        stdout=json.dumps({"title": "Use caller credentials"}),
+    )
+
+    assert load_issue_title("dodo5522/ai-agent-home", 33, runner) == "Use caller credentials"
+    assert runner.gh_environment is not None
+    assert runner.gh_environment["GH_TOKEN"] == "caller-token"
+    assert all(Path(call[0][0]).name != "get-github-app-token.py" for call in runner.calls)
 
 
 def test_short_title_collapses_whitespace_and_limits() -> None:
@@ -206,24 +271,24 @@ def test_short_title_collapses_whitespace_and_limits() -> None:
 
 
 def test_resolve_repository_rejects_non_github_remote() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["git", "-C", "/tmp/repo", "remote", "get-url", "origin"],
         CommandResult(0, "https://example.invalid/repo.git\n", ""),
     )
 
-    with pytest.raises(TaskStartError, match="GitHub remote"):
+    with pytest.raises(LifecycleError, match="GitHub remote"):
         resolve_repository(Path("/tmp/repo"), runner)
 
 
 def test_failed_git_does_not_echo_command_output() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["git", "-C", "/tmp/repo", "remote", "get-url", "origin"],
         CommandResult(1, "secret stdout", "secret stderr"),
     )
 
-    with pytest.raises(TaskStartError) as error:
+    with pytest.raises(LifecycleError) as error:
         resolve_repository(Path("/tmp/repo"), runner)
 
     assert "secret" not in str(error.value)
@@ -231,31 +296,31 @@ def test_failed_git_does_not_echo_command_output() -> None:
 
 @pytest.mark.parametrize("stdout", ["{}", "not json"])
 def test_invalid_issue_title_response_is_rejected(stdout: str) -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["gh", "issue", "view", "32", "--repo", "dodo5522/ai-agent-home", "--json", "title"],
         CommandResult(0, stdout, ""),
     )
 
-    with pytest.raises(TaskStartError, match="Issue title"):
+    with pytest.raises(LifecycleError, match="Issue title"):
         load_issue_title("dodo5522/ai-agent-home", 32, runner)
 
 
 def test_failed_issue_lookup_does_not_echo_command_output() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["gh", "issue", "view", "32", "--repo", "dodo5522/ai-agent-home", "--json", "title"],
         CommandResult(1, "secret stdout", "secret stderr"),
     )
 
-    with pytest.raises(TaskStartError) as error:
+    with pytest.raises(LifecycleError) as error:
         load_issue_title("dodo5522/ai-agent-home", 32, runner)
 
     assert "secret" not in str(error.value)
 
 
 def test_workspace_get_parses_identity() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["herdr", "workspace", "get", "w9"],
         CommandResult(
@@ -269,7 +334,7 @@ def test_workspace_get_parses_identity() -> None:
 
 
 def test_workspace_create_parses_ids_and_no_focus() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         [
             "herdr",
@@ -302,7 +367,7 @@ def test_workspace_create_parses_ids_and_no_focus() -> None:
 
 
 def test_tab_operations_parse_identity_and_use_no_focus() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["herdr", "tab", "get", "w9:t2"],
         CommandResult(
@@ -359,7 +424,7 @@ def test_tab_operations_parse_identity_and_use_no_focus() -> None:
 
 
 def test_panes_for_workspace_filters_by_tab() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["herdr", "pane", "list", "--workspace", "w9"],
         CommandResult(
@@ -382,32 +447,32 @@ def test_panes_for_workspace_filters_by_tab() -> None:
 
 
 def test_herdr_failures_and_malformed_json_are_rejected_without_echoing_output() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["herdr", "workspace", "get", "w9"],
         CommandResult(1, "secret stdout", "secret stderr"),
     )
-    with pytest.raises(TaskStartError) as error:
+    with pytest.raises(LifecycleError) as error:
         HerdrClient(runner).workspace_get("w9")
     assert "secret" not in str(error.value)
 
-    malformed = StubRunner()
+    malformed = RecordingRunner()
     malformed.respond(
         ["herdr", "workspace", "get", "w9"],
         CommandResult(0, "not json", ""),
     )
-    with pytest.raises(TaskStartError, match="JSON"):
+    with pytest.raises(LifecycleError, match="JSON"):
         HerdrClient(malformed).workspace_get("w9")
 
 
 def test_herdr_response_missing_identity_is_rejected() -> None:
-    runner = StubRunner()
+    runner = RecordingRunner()
     runner.respond(
         ["herdr", "workspace", "get", "w9"],
         CommandResult(0, json.dumps({"result": {"workspace": {"label": "owner/repo"}}}), ""),
     )
 
-    with pytest.raises(TaskStartError, match="workspace"):
+    with pytest.raises(LifecycleError, match="workspace"):
         HerdrClient(runner).workspace_get("w9")
 
 
@@ -449,7 +514,7 @@ def test_multiple_panes_fail_without_state_update(start_fixture: StartFixture) -
     before = start_fixture.state_bytes()
     start_fixture.herdr.set_panes(first.tab_id, ["w9:p3", "w9:p4"])
 
-    with pytest.raises(TaskStartError, match="exactly one pane"):
+    with pytest.raises(LifecycleError, match="exactly one pane"):
         start_fixture.run(32)
 
     assert start_fixture.state_bytes() == before
@@ -506,14 +571,14 @@ def test_missing_herdr_environment_is_rejected(
 ) -> None:
     monkeypatch.delenv("HERDR_ENV")
 
-    with pytest.raises(TaskStartError, match="HERDR_ENV"):
+    with pytest.raises(LifecycleError, match="HERDR_ENV"):
         start_fixture.run(32)
 
 
 def test_failed_workspace_create_leaves_state_absent(start_fixture: StartFixture) -> None:
     start_fixture.herdr.fail_create = True
 
-    with pytest.raises(TaskStartError, match="workspace create"):
+    with pytest.raises(LifecycleError, match="workspace create"):
         start_fixture.run(32)
 
     assert not start_fixture.state_path.exists()
@@ -522,7 +587,7 @@ def test_failed_workspace_create_leaves_state_absent(start_fixture: StartFixture
 def test_failed_tab_rename_leaves_state_absent(start_fixture: StartFixture) -> None:
     start_fixture.herdr.fail_rename = True
 
-    with pytest.raises(TaskStartError, match="tab rename"):
+    with pytest.raises(LifecycleError, match="tab rename"):
         start_fixture.run(32)
 
     assert not start_fixture.state_path.exists()
@@ -532,11 +597,11 @@ def test_failed_state_write_rolls_back_created_workspace(
     start_fixture: StartFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def fail_put(self: StateStore, key: str, task: Task) -> Task:
-        raise TaskStartError("state write failed")
+        raise LifecycleError("state write failed")
 
     monkeypatch.setattr(StateStore, "put", fail_put)
 
-    with pytest.raises(TaskStartError, match="state write failed"):
+    with pytest.raises(LifecycleError, match="state write failed"):
         start_fixture.run(32)
 
     assert not start_fixture.state_path.exists()
@@ -544,20 +609,14 @@ def test_failed_state_write_rolls_back_created_workspace(
 
 
 def test_start_cli_help_describes_issue_and_cwd(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit) as error:
-        start_main(["--help"])
-
-    assert error.value.code == 0
+    assert lifecycle_main(["start", "--help"]) == 0
     output = capsys.readouterr().out
     assert "ISSUE_NUMBER" in output
     assert "--cwd" in output
 
 
 def test_start_cli_rejects_invalid_issue(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit) as error:
-        start_main(["not-a-number"])
-
-    assert error.value.code == 2
+    assert lifecycle_main(["start", "not-a-number"]) == 2
     assert "ISSUE_NUMBER" in capsys.readouterr().err
 
 
@@ -566,5 +625,5 @@ def test_start_cli_maps_missing_herdr_environment_to_runtime_error(
 ) -> None:
     monkeypatch.delenv("HERDR_ENV", raising=False)
 
-    assert start_main(["32", "--cwd", str(tmp_path)]) == 1
+    assert lifecycle_main(["start", "32", "--cwd", str(tmp_path)]) == 1
     assert "HERDR_ENV" in capsys.readouterr().err

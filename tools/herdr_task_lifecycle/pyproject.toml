@@ -3,16 +3,16 @@ requires = ["setuptools>=75.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "herdr-task-start"
+name = "herdr-task"
 version = "0.1.0"
-description = "Create or reuse Herdr resources when starting a GitHub Issue"
+description = "Manage the Herdr task lifecycle"
 requires-python = ">=3.14"
 dependencies = [
     "herdr-task-state",
 ]
 
 [project.scripts]
-herdr-task-start = "herdr_task_start.cli:main"
+herdr-task = "herdr_task_lifecycle.cli:main"
 
 [dependency-groups]
 dev = [

@@ -1,12 +1,12 @@
-"""Subprocess boundary used by task-start adapters."""
+"""Subprocess boundary used by lifecycle adapters."""
 
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .errors import TaskStartError
+from .errors import LifecycleError
 
 
 @dataclass(frozen=True)
@@ -21,15 +21,25 @@ class CommandResult:
 class CommandRunner(Protocol):
     """Interface for running external commands."""
 
-    def run(self, arguments: Sequence[str], cwd: Path | None = None) -> CommandResult:
+    def run(
+        self,
+        arguments: Sequence[str],
+        cwd: Path | None = None,
+        environment: Mapping[str, str] | None = None,
+    ) -> CommandResult:
         """Run one command and capture its result."""
 
 
 class SubprocessRunner:
     """Run commands through Python's subprocess API without a shell."""
 
-    def run(self, arguments: Sequence[str], cwd: Path | None = None) -> CommandResult:
-        """Run one command and capture stdout, stderr, and its exit status."""
+    def run(
+        self,
+        arguments: Sequence[str],
+        cwd: Path | None = None,
+        environment: Mapping[str, str] | None = None,
+    ) -> CommandResult:
+        """Run one command with optional environment and capture its result."""
         try:
             completed = subprocess.run(
                 arguments,
@@ -37,7 +47,8 @@ class SubprocessRunner:
                 capture_output=True,
                 text=True,
                 check=False,
+                env=environment,
             )
         except OSError as error:
-            raise TaskStartError(f"cannot execute {arguments[0]}") from error
+            raise LifecycleError(f"cannot execute {arguments[0]}") from error
         return CommandResult(completed.returncode, completed.stdout, completed.stderr)
