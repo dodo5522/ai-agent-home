@@ -3,7 +3,7 @@
 import json
 import re
 from dataclasses import dataclass
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import (
     AfterValidator,
@@ -13,6 +13,7 @@ from pydantic import (
     StrictInt,
     StringConstraints,
     ValidationError,
+    field_serializer,
     field_validator,
     model_validator,
 )
@@ -39,6 +40,8 @@ RepositoryName = Annotated[str, StringConstraints(pattern=_REPOSITORY_PATTERN)]
 Slug = Annotated[str, StringConstraints(pattern=_SLUG_PATTERN)]
 PositiveInt = Annotated[StrictInt, Field(gt=0)]
 AbsolutePath = Annotated[NonEmptyString, AfterValidator(_absolute_path)]
+CleanupAction = Literal["tab", "worktree", "task_root"]
+_CLEANUP_ACTIONS: tuple[CleanupAction, ...] = ("tab", "worktree", "task_root")
 
 
 @dataclass(frozen=True)
@@ -174,6 +177,38 @@ class Workstream(Model):
         return values
 
 
+class CleanupProgress(Model):
+    """Persisted progress for lifecycle cleanup that can safely resume."""
+
+    task_root: AbsolutePath
+    phase: Literal["pending", "partial"]
+    completed_actions: set[CleanupAction]
+
+    @field_validator("completed_actions", mode="before")
+    @classmethod
+    def require_unique_completed_actions(cls, values: object) -> object:
+        if isinstance(values, list):
+            try:
+                completed_actions = set(values)
+            except TypeError:
+                return values
+            if len(values) != len(completed_actions):
+                raise ValueError("must contain unique cleanup actions")
+            return completed_actions
+        return values
+
+    @model_validator(mode="after")
+    def require_partial_progress(self) -> Self:
+        if self.phase == "partial" and not self.completed_actions:
+            raise ValueError("partial cleanup must contain a completed action")
+        return self
+
+    @field_serializer("completed_actions")
+    def serialize_completed_actions(self, values: set[CleanupAction]) -> list[CleanupAction]:
+        """Emit actions in lifecycle execution order rather than set iteration order."""
+        return [action for action in _CLEANUP_ACTIONS if action in values]
+
+
 class Task(Model):
     """Task metadata and its main or parallel workstreams."""
 
@@ -181,11 +216,14 @@ class Task(Model):
     issue_number: PositiveInt
     title: NonEmptyString | None = None
     herdr: HerdrReference | None = None
+    cleanup: CleanupProgress | None = None
     workstreams: dict[Slug, Workstream]
 
-    @field_validator("title", "herdr", mode="before")
+    @field_validator("title", "herdr", "cleanup", mode="before")
     @classmethod
-    def reject_null_optional_field(cls, value: str | HerdrReference | None) -> str | HerdrReference:
+    def reject_null_optional_field(
+        cls, value: str | HerdrReference | CleanupProgress | None
+    ) -> str | HerdrReference | CleanupProgress:
         if value is None:
             raise ValueError("must be omitted instead of null")
         return value
@@ -254,6 +292,8 @@ class TaskState(Model):
 
 __all__ = [
     "AgentReference",
+    "CleanupAction",
+    "CleanupProgress",
     "HerdrReference",
     "Model",
     "StateValidationError",

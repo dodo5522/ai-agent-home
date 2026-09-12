@@ -54,6 +54,7 @@ resources exist.
 | Stable identity | `workstreams.main` | Required primary workstream object. |
 | Stable identity | workstream slug | `main` or a lower-case parallel-workstream slug. |
 | Descriptive | `title` | Optional Issue title. |
+| Runtime cleanup | `cleanup` | Optional resumable cleanup-progress record. |
 | Runtime reference | `herdr.workspace_id` | Herdr workspace identifier, when known. |
 | Runtime reference | `herdr.workspace_label` | Optional Herdr workspace label. |
 | Runtime reference | `tab_id`, `tab_label` | Optional workstream Tab identifier and label. |
@@ -67,6 +68,24 @@ belongs to this task. Before mutating anything, callers must validate Herdr IDs
 against live Herdr state (and validate Git worktree and branch references with
 Git). A stale identifier remains valid stored data until a reconciler decides
 what to do with it.
+
+### Cleanup progress
+
+`cleanup` is optional. When omitted, the task is active and no cleanup has
+started. When present, it is a runtime record with these required fields:
+
+| Field | Valid values | Meaning |
+| --- | --- | --- |
+| `task_root` | Absolute path | The resolved task root approved for this cleanup run. |
+| `phase` | `pending`, `partial` | Cleanup has not yet completed, or stopped after recorded progress. |
+| `completed_actions` | Set of `tab`, `worktree`, and `task_root` | Actions already completed or found absent. |
+
+Completed actions are serialized in lifecycle action order: `tab`, `worktree`,
+then `task_root`. The record must not use null values or duplicate action names;
+`partial` requires at least one completed action. Lifecycle code deletes the
+cleanup record together with the task mapping only after cleanup has completed.
+For the operational cleanup, approval, and retry procedure, see
+[`HERDR-TASK-LIFECYCLE.md`](HERDR-TASK-LIFECYCLE.md).
 
 Unknown fields inside recognized objects are allowed for forward-compatible
 metadata. Changing the meaning or type of an existing field requires a new
