@@ -183,6 +183,7 @@ class CleanupProgress(Model):
     task_root: AbsolutePath
     phase: Literal["pending", "partial"]
     completed_actions: set[CleanupAction]
+    completed_targets: dict[CleanupAction, set[NonEmptyString]] = Field(default_factory=dict)
 
     @field_validator("completed_actions", mode="before")
     @classmethod
@@ -197,16 +198,37 @@ class CleanupProgress(Model):
             return completed_actions
         return values
 
-    @model_validator(mode="after")
-    def require_partial_progress(self) -> Self:
-        if self.phase == "partial" and not self.completed_actions:
-            raise ValueError("partial cleanup must contain a completed action")
-        return self
+    @field_validator("completed_targets", mode="before")
+    @classmethod
+    def require_unique_completed_targets(cls, values: object) -> object:
+        if not isinstance(values, dict):
+            return values
+        normalized: dict[object, object] = {}
+        for action, targets in values.items():
+            if not isinstance(targets, list):
+                normalized[action] = targets
+                continue
+            try:
+                unique_targets = set(targets)
+            except TypeError:
+                normalized[action] = targets
+                continue
+            if len(targets) != len(unique_targets):
+                raise ValueError("must contain unique cleanup targets")
+            normalized[action] = unique_targets
+        return normalized
 
     @field_serializer("completed_actions")
     def serialize_completed_actions(self, values: set[CleanupAction]) -> list[CleanupAction]:
         """Emit actions in lifecycle execution order rather than set iteration order."""
         return [action for action in _CLEANUP_ACTIONS if action in values]
+
+    @field_serializer("completed_targets")
+    def serialize_completed_targets(
+        self, values: dict[CleanupAction, set[str]]
+    ) -> dict[CleanupAction, list[str]]:
+        """Emit target progress in action order with sorted opaque identities."""
+        return {action: sorted(values[action]) for action in _CLEANUP_ACTIONS if action in values}
 
 
 class Task(Model):

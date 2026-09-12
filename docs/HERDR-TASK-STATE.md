@@ -79,12 +79,15 @@ started. When present, it is a runtime record with these required fields:
 | `task_root` | Absolute path | The resolved task root approved for this cleanup run. |
 | `phase` | `pending`, `partial` | Cleanup has not yet completed, or stopped after recorded progress. |
 | `completed_actions` | Set of `tab`, `worktree`, and `task_root` | Actions already completed or found absent. |
+| `completed_targets` | Optional action-to-identifier sets | Individual targets completed or found absent within an unfinished action. |
 
 Completed actions are serialized in lifecycle action order: `tab`, `worktree`,
-then `task_root`. The record must not use null values or duplicate action names;
-`partial` requires at least one completed action. Lifecycle code deletes the
-cleanup record together with the task mapping only after cleanup has completed.
-For the operational cleanup, approval, and retry procedure, see
+then `task_root`; completed targets are serialized in the same action order with
+sorted identifiers. The record must not use null values, duplicate action names,
+or duplicate target identifiers. `partial` may have no completed action when the
+first cleanup target failed. Lifecycle code deletes the cleanup record together
+with the task mapping only after cleanup has completed. For the operational
+cleanup, approval, and retry procedure, see
 [`HERDR-TASK-LIFECYCLE.md`](HERDR-TASK-LIFECYCLE.md).
 
 Unknown fields inside recognized objects are allowed for forward-compatible

@@ -5,7 +5,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-from herdr_task_state.model import HerdrReference, Task, TaskKey, TaskState, Workstream
+from herdr_task_state.model import (
+    CleanupProgress,
+    HerdrReference,
+    Task,
+    TaskKey,
+    TaskState,
+    Workstream,
+)
 from herdr_task_state.store import StateStore
 
 from herdr_task_lifecycle.cli import main as lifecycle_main
@@ -27,6 +34,8 @@ class FakeCleanupHerdr:
     workspaces: dict[str, WorkspaceInfo]
     tabs: dict[str, TabInfo]
     failure: str | None = None
+    fail_tab_id: str | None = None
+    close_calls: list[str] = field(default_factory=list)
 
     def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
         return self.workspaces.get(workspace_id)
@@ -36,9 +45,11 @@ class FakeCleanupHerdr:
 
     def tab_close(self, tab_id: str) -> None:
         self.events.append("tab")
-        if self.failure == "tab":
+        self.close_calls.append(tab_id)
+        if self.failure == "tab" or self.fail_tab_id == tab_id:
             raise LifecycleError("injected tab failure")
-        self.tabs.pop(tab_id, None)
+        if self.tabs.pop(tab_id, None) is None:
+            raise LifecycleError("cannot close absent tab")
 
 
 @dataclass
@@ -48,8 +59,10 @@ class FakeCleanupRunner:
     registered_worktrees: set[Path]
     events: list[str]
     failure: str | None = None
+    fail_worktree: Path | None = None
     remove_marker_after_worktree: Path | None = None
     calls: list[tuple[str, ...]] = field(default_factory=list)
+    remove_calls: list[Path] = field(default_factory=list)
 
     def run(
         self,
@@ -82,9 +95,10 @@ class FakeCleanupRunner:
             "remove",
         ):
             self.events.append("worktree")
-            if self.failure == "worktree":
-                return CommandResult(1, "sensitive stdout", "sensitive stderr")
             target = Path(command[5])
+            self.remove_calls.append(target)
+            if self.failure == "worktree" or self.fail_worktree == target:
+                return CommandResult(1, "sensitive stdout", "sensitive stderr")
             self.registered_worktrees.remove(target)
             shutil.rmtree(target)
             if self.remove_marker_after_worktree is not None:
@@ -97,8 +111,13 @@ class RecordingTaskStateRepository(TaskStateRepository):
     def __init__(self, path: Path, events: list[str]) -> None:
         super().__init__(path)
         self._events = events
+        self.fail_remove_once = False
+        self.remove_attempts = 0
 
     def remove_task_after_cleanup(self, task_key: TaskKey) -> None:
+        self.remove_attempts += 1
+        if self.fail_remove_once and self.remove_attempts == 1:
+            raise LifecycleError("injected state removal failure")
         super().remove_task_after_cleanup(task_key)
         self._events.append("state")
 
@@ -114,6 +133,7 @@ class CleanupFixture:
     events: list[str]
     runner: FakeCleanupRunner
     herdr: FakeCleanupHerdr
+    state_repository: RecordingTaskStateRepository
 
     @property
     def planner(self) -> CleanupPlanner:
@@ -138,7 +158,7 @@ class CleanupFixture:
             herdr=self.herdr,
             tasks_directory=self.tasks_directory,
             remove_task_root=remove_task_root,
-            state_repository=RecordingTaskStateRepository(self.state_path, self.events),
+            state_repository=self.state_repository,
         )
 
     def state(self) -> TaskState:
@@ -150,7 +170,25 @@ class CleanupFixture:
 
     def clear_failure(self) -> None:
         self.runner.failure = None
+        self.runner.fail_worktree = None
         self.herdr.failure = None
+        self.herdr.fail_tab_id = None
+
+    def add_workstream(self, name: str, tab_id: str, worktree: Path) -> None:
+        worktree.mkdir(parents=True, exist_ok=True)
+        (worktree / ".git").write_text("gitdir: test\n", encoding="utf-8")
+        task = self.state().tasks[str(self.task_key)]
+        workstream = Workstream(
+            tab_id=tab_id,
+            tab_label=f"33 {name}",
+            worktree=str(worktree),
+        )
+        StateStore(self.state_path).put(
+            str(self.task_key),
+            task.model_copy(update={"workstreams": {**task.workstreams, name: workstream}}),
+        )
+        self.herdr.tabs[tab_id] = TabInfo(tab_id, "w9", f"33 {name}")
+        self.runner.registered_worktrees.add(worktree)
 
 
 @pytest.fixture
@@ -186,6 +224,7 @@ def cleanup_fixture(tmp_path: Path) -> CleanupFixture:
         {"w9": WorkspaceInfo("w9", "dodo5522/ai-agent-home")},
         {"w9:t33": TabInfo("w9:t33", "w9", "33 Cleanup execution")},
     )
+    state_repository = RecordingTaskStateRepository(state_path, events)
     return CleanupFixture(
         tasks_directory,
         repository_path,
@@ -196,6 +235,7 @@ def cleanup_fixture(tmp_path: Path) -> CleanupFixture:
         events,
         runner,
         herdr,
+        state_repository,
     )
 
 
@@ -245,6 +285,152 @@ def test_execute_persists_partial_progress_and_retry_skips_completed_action(
     ]
 
 
+def test_first_action_failure_persists_partial_with_no_completed_actions(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    cleanup_fixture.fail_on("tab")
+
+    with pytest.raises(LifecycleError, match="tab"):
+        cleanup_fixture.executor.execute(
+            cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+            cleanup_fixture.task_root,
+        )
+
+    task = cleanup_fixture.state().tasks[str(cleanup_fixture.task_key)]
+    assert task.cleanup is not None
+    assert task.cleanup.phase == "partial"
+    assert task.cleanup.completed_actions == set()
+    assert task.cleanup.completed_targets == {}
+
+    cleanup_fixture.clear_failure()
+    cleanup_fixture.executor.execute(
+        cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+        cleanup_fixture.task_root,
+    )
+
+    assert cleanup_fixture.herdr.close_calls == ["w9:t33", "w9:t33"]
+
+
+def test_multi_tab_partial_failure_persists_target_and_retry_does_not_close_it_again(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    cleanup_fixture.add_workstream("review", "w9:t34", cleanup_fixture.worktree)
+    cleanup_fixture.herdr.fail_tab_id = "w9:t34"
+
+    with pytest.raises(LifecycleError, match="tab"):
+        cleanup_fixture.executor.execute(
+            cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+            cleanup_fixture.task_root,
+        )
+
+    task = cleanup_fixture.state().tasks[str(cleanup_fixture.task_key)]
+    assert task.cleanup is not None
+    assert task.cleanup.phase == "partial"
+    assert task.cleanup.completed_targets == {"tab": {"w9:t33"}}
+
+    cleanup_fixture.clear_failure()
+    cleanup_fixture.executor.execute(
+        cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+        cleanup_fixture.task_root,
+    )
+
+    assert cleanup_fixture.herdr.close_calls.count("w9:t33") == 1
+    assert cleanup_fixture.herdr.close_calls.count("w9:t34") == 2
+
+
+def test_multi_worktree_partial_failure_persists_target_and_retry_does_not_remove_it_again(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    review_worktree = cleanup_fixture.task_root / "z-review-worktree"
+    cleanup_fixture.add_workstream("review", "w9:t-review", review_worktree)
+    cleanup_fixture.runner.fail_worktree = review_worktree
+
+    with pytest.raises(LifecycleError, match="worktree"):
+        cleanup_fixture.executor.execute(
+            cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+            cleanup_fixture.task_root,
+        )
+
+    task = cleanup_fixture.state().tasks[str(cleanup_fixture.task_key)]
+    assert task.cleanup is not None
+    assert task.cleanup.phase == "partial"
+    assert task.cleanup.completed_targets == {
+        "tab": {"w9:t33", "w9:t-review"},
+        "worktree": {str(cleanup_fixture.worktree)},
+    }
+
+    cleanup_fixture.clear_failure()
+    cleanup_fixture.executor.execute(
+        cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+        cleanup_fixture.task_root,
+    )
+
+    assert cleanup_fixture.runner.remove_calls.count(cleanup_fixture.worktree) == 1
+    assert cleanup_fixture.runner.remove_calls.count(review_worktree) == 2
+
+
+def test_mixed_absent_and_live_tabs_close_only_the_live_target(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    cleanup_fixture.add_workstream("review", "w9:t34", cleanup_fixture.worktree)
+    cleanup_fixture.herdr.tabs.pop("w9:t33")
+
+    cleanup_fixture.executor.execute(
+        cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+        cleanup_fixture.task_root,
+    )
+
+    assert cleanup_fixture.herdr.close_calls == ["w9:t34"]
+
+
+def test_mixed_absent_and_live_worktrees_remove_only_the_registered_target(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    review_worktree = cleanup_fixture.task_root / "z-review-worktree"
+    cleanup_fixture.add_workstream("review", "w9:t-review", review_worktree)
+    cleanup_fixture.runner.registered_worktrees.remove(cleanup_fixture.worktree)
+    shutil.rmtree(cleanup_fixture.worktree)
+
+    cleanup_fixture.executor.execute(
+        cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+        cleanup_fixture.task_root,
+    )
+
+    assert cleanup_fixture.runner.remove_calls == [review_worktree]
+
+
+def test_retry_blocks_a_completed_worktree_action_whose_target_is_live_again(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    task = cleanup_fixture.state().tasks[str(cleanup_fixture.task_key)]
+    StateStore(cleanup_fixture.state_path).put(
+        str(cleanup_fixture.task_key),
+        task.model_copy(
+            update={
+                "cleanup": CleanupProgress(
+                    task_root=str(cleanup_fixture.task_root),
+                    phase="partial",
+                    completed_actions={"tab", "worktree"},
+                    completed_targets={
+                        "tab": {"w9:t33"},
+                        "worktree": {str(cleanup_fixture.worktree)},
+                    },
+                )
+            }
+        ),
+    )
+    cleanup_fixture.herdr.tabs.clear()
+
+    with pytest.raises(LifecycleError, match="worktree"):
+        cleanup_fixture.executor.execute(
+            cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+            cleanup_fixture.task_root,
+        )
+
+    assert cleanup_fixture.task_root.exists()
+    assert cleanup_fixture.runner.remove_calls == []
+
+
 def test_execute_refuses_different_confirmed_root(cleanup_fixture: CleanupFixture) -> None:
     with pytest.raises(LifecycleError, match="confirm-task-root"):
         cleanup_fixture.executor.execute(
@@ -271,6 +457,33 @@ def test_execute_revalidates_before_each_action_and_preserves_mapping(
     assert task.cleanup.phase == "partial"
     assert task.cleanup.completed_actions == {"tab", "worktree"}
     assert cleanup_fixture.task_root.exists()
+
+
+def test_state_removal_failure_after_root_deletion_is_retryable(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    cleanup_fixture.state_repository.fail_remove_once = True
+
+    with pytest.raises(LifecycleError, match="task_root"):
+        cleanup_fixture.executor.execute(
+            cleanup_fixture.planner.plan(cleanup_fixture.task_key),
+            cleanup_fixture.task_root,
+        )
+
+    assert not cleanup_fixture.task_root.exists()
+    task = cleanup_fixture.state().tasks[str(cleanup_fixture.task_key)]
+    assert task.cleanup is not None
+    assert task.cleanup.phase == "partial"
+    assert task.cleanup.completed_actions == {"tab", "worktree", "task_root"}
+
+    retry_plan = cleanup_fixture.planner.plan(cleanup_fixture.task_key)
+    assert {action.outcome for action in retry_plan.actions} == {"already_absent"}
+
+    result = cleanup_fixture.executor.execute(retry_plan, cleanup_fixture.task_root)
+
+    assert result.mapping_removed is True
+    assert cleanup_fixture.events == ["tab", "worktree", "task_root", "state"]
+    assert cleanup_fixture.state().tasks == {}
 
 
 def test_execute_skips_validated_actions_that_are_already_absent(

@@ -17,6 +17,7 @@ from .planner import (
     _TASKS_DIRECTORY,
     CleanupActionName,
     CleanupActionPlan,
+    CleanupOutcome,
     CleanupPlan,
     CleanupPlanner,
 )
@@ -147,12 +148,32 @@ class CleanupExecutor:
             raise LifecycleError(f"cleanup {action.action} state changed after revalidation")
         return targets
 
-    def _close_tabs(self, tab_ids: tuple[str, ...]) -> None:
-        for tab_id in tab_ids:
-            self._herdr.tab_close(tab_id)
+    def _revalidate_target(
+        self,
+        task_key: TaskKey,
+        action_name: CleanupActionName,
+        target: str,
+    ) -> CleanupOutcome:
+        if action_name == "tab":
+            return self._planner.revalidate_tab_target(task_key, target)
+        if action_name == "worktree":
+            return self._planner.revalidate_worktree_target(
+                task_key, Path(target).resolve(strict=False)
+            )
+        return "delete"
 
-    def _remove_worktrees(self, targets: tuple[str, ...]) -> None:
-        for target in targets:
+    def _perform_target(
+        self,
+        task_key: TaskKey,
+        action_name: CleanupActionName,
+        target: str,
+        task_root: Path,
+    ) -> None:
+        if self._revalidate_target(task_key, action_name, target) == "already_absent":
+            return
+        if action_name == "tab":
+            self._herdr.tab_close(target)
+        elif action_name == "worktree":
             result = self._runner.run(
                 [
                     "git",
@@ -165,37 +186,52 @@ class CleanupExecutor:
             )
             if result.returncode != 0:
                 raise LifecycleError("Git worktree removal failed")
-
-    def _perform_action(
-        self, task_key: TaskKey, action: CleanupActionPlan, task_root: Path
-    ) -> None:
-        task = self._state.read_task(task_key)
-        targets = self._state_targets(action, task, task_root)
-        if action.outcome == "already_absent":
-            return
-        if action.action == "tab":
-            self._close_tabs(targets)
-        elif action.action == "worktree":
-            self._remove_worktrees(targets)
         else:
             self._remove_task_root(task_root)
+
+    def _progress(
+        self,
+        task_root: Path,
+        phase: str,
+        completed: set[CleanupActionName],
+        completed_targets: dict[CleanupActionName, set[str]],
+    ) -> CleanupProgress:
+        return CleanupProgress(
+            phase=phase,
+            completed_actions=completed,
+            completed_targets={
+                action: set(targets) for action, targets in completed_targets.items() if targets
+            },
+            task_root=str(task_root),
+        )
+
+    def _verify_completed_action(
+        self,
+        plan: CleanupPlan,
+        action_name: CleanupActionName,
+        task_root: Path,
+    ) -> None:
+        action = self._revalidate_action(plan, action_name)
+        if action_name == "task_root":
+            if action.outcome != "already_absent":
+                raise LifecycleError("cleanup task_root completed target is live")
+            return
+        task = self._state.read_task(plan.task_key)
+        for target in self._state_targets(action, task, task_root):
+            if self._revalidate_target(plan.task_key, action_name, target) != "already_absent":
+                raise LifecycleError(f"cleanup {action_name} completed target is live")
 
     def _record_failure(
         self,
         task_key: TaskKey,
         task_root: Path,
         completed: set[CleanupActionName],
+        completed_targets: dict[CleanupActionName, set[str]],
     ) -> None:
-        if not completed:
-            return
         try:
             self._state.record_cleanup_progress(
                 task_key,
-                CleanupProgress(
-                    phase="partial",
-                    completed_actions=completed,
-                    task_root=str(task_root),
-                ),
+                self._progress(task_root, "partial", completed, completed_targets),
             )
         except LifecycleError:
             pass
@@ -207,42 +243,57 @@ class CleanupExecutor:
         task = self._state.read_task(plan.task_key)
         if task.cleanup is None:
             completed: set[CleanupActionName] = set()
+            completed_targets: dict[CleanupActionName, set[str]] = {}
             phase = "pending"
         else:
             stored_root = Path(task.cleanup.task_root).resolve(strict=False)
             if stored_root != task_root:
                 raise LifecycleError("stored cleanup root does not match --confirm-task-root")
             completed = set(task.cleanup.completed_actions)
+            completed_targets = {
+                action: set(targets) for action, targets in task.cleanup.completed_targets.items()
+            }
             phase = task.cleanup.phase
 
         self._state.record_cleanup_progress(
             plan.task_key,
-            CleanupProgress(
-                phase=phase,
-                completed_actions=completed,
-                task_root=str(task_root),
-            ),
+            self._progress(task_root, phase, completed, completed_targets),
         )
 
         current_action: CleanupActionName = "tab"
         try:
             for current_action in _ACTION_ORDER:
                 if current_action in completed:
+                    self._verify_completed_action(plan, current_action, task_root)
                     continue
                 action = self._revalidate_action(plan, current_action)
-                self._perform_action(plan.task_key, action, task_root)
+                task = self._state.read_task(plan.task_key)
+                targets = self._state_targets(action, task, task_root)
+                action_targets = completed_targets.setdefault(current_action, set())
+                for target in targets:
+                    if target in action_targets:
+                        if (
+                            self._revalidate_target(plan.task_key, current_action, target)
+                            != "already_absent"
+                        ):
+                            raise LifecycleError(
+                                f"cleanup {current_action} completed target is live"
+                            )
+                        continue
+                    self._perform_target(plan.task_key, current_action, target, task_root)
+                    action_targets.add(target)
+                    self._state.record_cleanup_progress(
+                        plan.task_key,
+                        self._progress(task_root, phase, completed, completed_targets),
+                    )
                 completed.add(current_action)
                 self._state.record_cleanup_progress(
                     plan.task_key,
-                    CleanupProgress(
-                        phase=phase,
-                        completed_actions=completed,
-                        task_root=str(task_root),
-                    ),
+                    self._progress(task_root, phase, completed, completed_targets),
                 )
             self._state.remove_task_after_cleanup(plan.task_key)
         except (LifecycleError, OSError) as error:
-            self._record_failure(plan.task_key, task_root, completed)
+            self._record_failure(plan.task_key, task_root, completed, completed_targets)
             raise LifecycleError(f"cleanup {current_action} failed") from error
 
         return CleanupResult(plan.task_key, _ACTION_ORDER, mapping_removed=True)

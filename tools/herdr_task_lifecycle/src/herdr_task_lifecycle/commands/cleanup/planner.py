@@ -175,6 +175,21 @@ class CleanupPlanner:
             "tab", "delete", target, "stored Tab matches its live workspace and label"
         )
 
+    def revalidate_tab_target(self, task_key: TaskKey, tab_id: str) -> CleanupOutcome:
+        """Revalidate one exact stored Tab immediately before cleanup mutation."""
+        task = self._state.read_task(task_key)
+        workstreams = {
+            name: workstream
+            for name, workstream in task.workstreams.items()
+            if workstream.tab_id == tab_id
+        }
+        if not workstreams:
+            raise LifecycleError("cleanup tab target is no longer stored")
+        action = self._plan_tabs(task.model_copy(update={"workstreams": workstreams}))
+        if action.outcome == "blocked":
+            raise LifecycleError("cleanup tab target is blocked")
+        return action.outcome
+
     def _git_worktrees(self) -> tuple[list[_GitWorktree] | None, str | None]:
         result = self._runner.run(
             [
@@ -221,6 +236,11 @@ class CleanupPlanner:
 
     def _candidate_root(self, task: Task, worktrees: list[Path]) -> tuple[Path | None, str | None]:
         discovered_roots = [self._find_marked_root(path) for path in worktrees]
+        if task.cleanup is not None and "task_root" in task.cleanup.completed_actions:
+            cleanup_root = Path(task.cleanup.task_root).resolve(strict=False)
+            if any(root is not None and root != cleanup_root for root in discovered_roots):
+                return None, "stored cleanup root does not match worktree marker"
+            return cleanup_root, None
         if any(root is None for root in discovered_roots):
             return None, "every stored worktree must resolve to a direct .codex-task-root marker"
         roots = {root for root in discovered_roots if root is not None}
@@ -275,6 +295,18 @@ class CleanupPlanner:
         return CleanupActionPlan(
             "worktree", "delete", target, "stored path is a registered non-primary worktree"
         )
+
+    def revalidate_worktree_target(self, task_key: TaskKey, target: Path) -> CleanupOutcome:
+        """Revalidate one exact stored worktree immediately before Git mutation."""
+        task = self._state.read_task(task_key)
+        stored = self._stored_worktrees(task)
+        if target not in stored:
+            raise LifecycleError("cleanup worktree target is no longer stored")
+        records, inventory_error = self._git_worktrees()
+        action = self._plan_worktrees([target], records, inventory_error)
+        if action.outcome == "blocked":
+            raise LifecycleError("cleanup worktree target is blocked")
+        return action.outcome
 
     def _plan_task_root(
         self,
