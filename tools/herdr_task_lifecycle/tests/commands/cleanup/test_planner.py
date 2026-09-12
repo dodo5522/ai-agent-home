@@ -525,24 +525,6 @@ def test_cleanup_execute_requires_absolute_confirmation(
     assert "absolute" in capsys.readouterr().err
 
 
-def test_cleanup_execute_stays_unavailable_until_executor_exists(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    assert (
-        lifecycle_main(
-            [
-                "cleanup",
-                "33",
-                "--execute",
-                "--confirm-task-root",
-                "/home/takashi/work/tasks/issue-33",
-            ]
-        )
-        == 1
-    )
-    assert "not available" in capsys.readouterr().err
-
-
 def test_planner_rejects_missing_task(cleanup_fixture: CleanupFixture) -> None:
     with pytest.raises(LifecycleError, match="task is not present"):
         cleanup_fixture.planner.plan(TaskKey("dodo5522/ai-agent-home", 34))

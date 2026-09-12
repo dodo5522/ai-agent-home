@@ -1,4 +1,4 @@
-"""CLI wiring for read-only cleanup plans and guarded future execution."""
+"""CLI wiring for read-only cleanup plans and guarded execution."""
 
 import argparse
 from pathlib import Path
@@ -9,6 +9,7 @@ from ...errors import ExitCode, LifecycleError
 from ...identity import resolve_repository
 from ...runner import SubprocessRunner
 from ...state import state_path
+from .executor import CleanupExecutor
 from .planner import CleanupPlanner
 
 
@@ -34,16 +35,24 @@ def _run(args: argparse.Namespace) -> int:
     if args.execute:
         if args.confirm_task_root is None:
             parser.error("--execute requires --confirm-task-root")
-        raise LifecycleError("cleanup execution is not available until the executor is installed")
-    if args.confirm_task_root is not None:
+    elif args.confirm_task_root is not None:
         parser.error("--confirm-task-root requires --execute")
 
     cwd = Path.cwd().resolve()
     runner = SubprocessRunner()
     repository = resolve_repository(cwd, runner)
     task_key = TaskKey(repository, args.issue_number)
-    plan = CleanupPlanner(state_path(), cwd, runner=runner).plan(task_key)
-    print(plan.to_json())
+    task_state_path = state_path()
+    plan = CleanupPlanner(task_state_path, cwd, runner=runner).plan(task_key)
+    if args.execute:
+        if any(action.outcome == "blocked" for action in plan.actions):
+            raise LifecycleError("cleanup plan contains a blocked action")
+        result = CleanupExecutor(task_state_path, cwd, runner=runner).execute(
+            plan, args.confirm_task_root
+        )
+        print(result.to_json())
+    else:
+        print(plan.to_json())
     return ExitCode.SUCCESS
 
 
