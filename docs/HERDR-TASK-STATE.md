@@ -3,9 +3,9 @@
 This document is the operator reference for the versioned task-state store used
 by the Herdr automation. It describes persistent identity and runtime
 references only. It does not create, rename, focus, or delete Herdr resources.
-The full Space/Tab lifecycle tables belong to
-[`docs/HERDR-WORK-MANAGEMENT.md`](HERDR-WORK-MANAGEMENT.md), owned by Issue
-#33.
+The full resource lifecycle tables and operational rules belong to
+[`HERDR-TASK-LIFECYCLE.md`](HERDR-TASK-LIFECYCLE.md). This state reference does
+not repeat them.
 
 ## Stable identity
 
