@@ -72,7 +72,17 @@ class _HerdrOperations(Protocol):
         """List panes belonging to one tab."""
 
 
-class HerdrClient(_HerdrOperations):
+class _HerdrPlanningOperations(Protocol):
+    """Read-only Herdr operations required by cleanup planning."""
+
+    def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
+        """Return the exact live workspace, or None when it is absent."""
+
+    def tab_find(self, tab_id: str) -> TabInfo | None:
+        """Return the exact live tab, or None when it is absent."""
+
+
+class HerdrClient(_HerdrOperations, _HerdrPlanningOperations):
     """Typed adapter for the Herdr JSON CLI interface."""
 
     def __init__(self, runner: CommandRunner) -> None:
@@ -115,6 +125,21 @@ class HerdrClient(_HerdrOperations):
             raise LifecycleError("Herdr workspace identity mismatch")
         return WorkspaceInfo(actual_id, self._string(workspace, "label"))
 
+    def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
+        """Find one workspace by opaque ID without inferring ownership from labels."""
+        payload = self._request(["workspace", "list"])
+        raw_workspaces = payload.get("workspaces")
+        if not isinstance(raw_workspaces, list):
+            raise LifecycleError("Herdr response has no workspaces list")
+        for raw_workspace in raw_workspaces:
+            if not isinstance(raw_workspace, dict):
+                raise LifecycleError("Herdr workspace response contains an invalid workspace")
+            workspace = cast(Mapping[str, object], raw_workspace)
+            actual_id = self._string(workspace, "workspace_id")
+            if actual_id == workspace_id:
+                return WorkspaceInfo(actual_id, self._string(workspace, "label"))
+        return None
+
     def workspace_create(self, label: str, cwd: Path) -> CreatedResources:
         """Create a background workspace and return its opaque resource IDs."""
         payload = self._request(
@@ -144,6 +169,25 @@ class HerdrClient(_HerdrOperations):
         if actual_id != tab_id:
             raise LifecycleError("Herdr tab identity mismatch")
         return TabInfo(actual_id, self._string(tab, "workspace_id"), self._string(tab, "label"))
+
+    def tab_find(self, tab_id: str) -> TabInfo | None:
+        """Find one tab by opaque ID without inferring ownership from labels."""
+        payload = self._request(["tab", "list"])
+        raw_tabs = payload.get("tabs")
+        if not isinstance(raw_tabs, list):
+            raise LifecycleError("Herdr response has no tabs list")
+        for raw_tab in raw_tabs:
+            if not isinstance(raw_tab, dict):
+                raise LifecycleError("Herdr tab response contains an invalid tab")
+            tab = cast(Mapping[str, object], raw_tab)
+            actual_id = self._string(tab, "tab_id")
+            if actual_id == tab_id:
+                return TabInfo(
+                    actual_id,
+                    self._string(tab, "workspace_id"),
+                    self._string(tab, "label"),
+                )
+        return None
 
     def tab_create(self, workspace_id: str, label: str, cwd: Path) -> CreatedResources:
         """Create a background tab with one root pane."""

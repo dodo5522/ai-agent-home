@@ -4,13 +4,9 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
+from .commands.cleanup.command import add_parser as add_cleanup_parser
 from .commands.start.command import add_parser as add_start_parser
 from .errors import ExitCode, LifecycleError
-
-
-def _unavailable_command(_: argparse.Namespace) -> int:
-    """Report a lifecycle operation that a later package will implement."""
-    raise LifecycleError("this lifecycle command is not available yet")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -20,8 +16,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_start_parser(subparsers)
-    cleanup = subparsers.add_parser("cleanup", help="Cleanup a Herdr task.")
-    cleanup.set_defaults(handler=_unavailable_command)
+    add_cleanup_parser(subparsers)
     return parser
 
 
