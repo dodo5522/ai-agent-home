@@ -4,6 +4,7 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
+from .commands.start.command import add_parser as add_start_parser
 from .errors import ExitCode, LifecycleError
 
 
@@ -18,9 +19,9 @@ def _parser() -> argparse.ArgumentParser:
         description="Manage the Herdr task lifecycle.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for name in ("start", "cleanup"):
-        command = subparsers.add_parser(name, help=f"{name.capitalize()} a Herdr task.")
-        command.set_defaults(handler=_unavailable_command)
+    add_start_parser(subparsers)
+    cleanup = subparsers.add_parser("cleanup", help="Cleanup a Herdr task.")
+    cleanup.set_defaults(handler=_unavailable_command)
     return parser
 
 
