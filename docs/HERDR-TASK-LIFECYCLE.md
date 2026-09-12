@@ -42,18 +42,22 @@ stable key.
 
 ## Managed and unmanaged boundaries
 
-A resource is eligible for managed operations only when its exact identifier
-is recorded on this task in the task-state file. Before a mutation, the CLI
-validates that the stored identifier still names the expected live resource;
-an exact target that is no longer live may be reported as `already_absent`.
-Labels, directory names, display order, and matching cwd values are
-descriptive; they never prove ownership.
+A Workspace is a repository-wide managed resource shared by tasks in the same
+repository. `start` may reuse its stored ID from any same-repository task only
+after the live Workspace label matches that repository. All other resources
+are task- or workstream-scoped and are eligible for managed operations only
+when their exact identifiers are recorded on the current task. Before a
+mutation, the CLI validates that the stored identifier still names the
+expected live resource; an exact target that is no longer live may be reported
+as `already_absent`. Labels, directory names, display order, and matching cwd
+values are descriptive; they never prove ownership.
 
 `start` may reuse or modify only state-recorded Workspace and Tab IDs. If a
 stored ID is stale, it creates a replacement managed resource without adopting,
 renaming, moving, or deleting a label-matched unmanaged resource. A resource
-created manually, recorded for another task, or absent from state remains
-unmanaged even when its label looks identical.
+created manually or absent from state remains unmanaged even when its label
+looks identical. A resource recorded only for another task cannot be adopted,
+except for the validated same-repository Workspace described above.
 
 `cleanup` considers only the current task's state-recorded Tabs and worktrees
 and their one validated task root. It never closes the repository Workspace,
@@ -106,11 +110,20 @@ rename, remove, or write any resource.
 | `already_absent` | The managed target is no longer live. | No destructive operation is needed; execution records completion. |
 | `blocked` | Ownership, live identity, path safety, or inventory cannot be proven. | Do not execute. Resolve the mismatch and run a new plan. |
 
-Show the complete JSON plan to the human. Confirm that the task key is the
+Show the complete JSON preview to the human. Confirm that the task key is the
 intended Issue, every target belongs to it, there are no `blocked` actions,
 and the task root is the expected exact absolute path. Ask for explicit
-approval to execute that plan. Planning output or a prior approval is not
-permission to execute a changed plan.
+approval to attempt cleanup for that task and exact root under the validated
+managed-resource boundaries.
+
+The current CLI does not bind execution to the previously displayed plan:
+there is no plan digest or plan input on `--execute`. Instead, `--execute`
+builds a fresh plan in its own invocation and `--confirm-task-root` binds only
+the exact resolved root. Run `--plan` immediately before requesting approval
+and executing, and avoid intervening state or resource changes. Any newly
+displayed preview is a fresh plan and requires fresh approval. If approval
+must be bound to an immutable plan digest, do not use `--execute` in this
+release.
 
 Only after approval, copy the exact `task_root` value into the guarded command:
 
@@ -120,9 +133,9 @@ bin/herdr-task cleanup 32 --execute \
 ```
 
 The confirmation must be an absolute, already-resolved path that exactly
-matches the planned root. Immediately before every mutation, execution creates
-and revalidates the current plan. A changed target or a `blocked` action stops
-execution.
+matches the fresh execution plan's root. Execution rejects a `blocked` plan,
+then revalidates the fresh plan and its exact targets before mutations. It does
+not compare that plan with the previously displayed preview.
 
 Execution proceeds in this order:
 
