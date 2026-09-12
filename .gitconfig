@@ -5,3 +5,15 @@
 	editor = vim
 [credential "https://github.com"]
 	helper = /home/takashi/bin/git-credential-helper
+[alias]
+        df = diff
+        dh = diff HEAD^ HEAD
+        co = checkout
+        ci = commit
+        ch = cherry-pick
+        st = status
+        sw = switch
+        br = branch
+        lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+        lga = log --graph --all --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+        pushf = push --force-with-lease
