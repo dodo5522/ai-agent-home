@@ -101,18 +101,17 @@ Herdr 管理下の workspace、pane、Agent を Codex から安全に操作す�
 [`docs/HERDR-SKILL.md`](docs/HERDR-SKILL.md) を参照してください。upstream Skill の
 配置、発火条件、Agent の状態別対応、更新方法を記載しています。
 
-### Herdr タスク状態
+### Herdr タスクライフサイクル
 
-Issue 単位の安定したタスク識別子、状態ファイルのスキーマ、CLI の使い方と
-安全性の保証は [`docs/HERDR-TASK-STATE.md`](docs/HERDR-TASK-STATE.md) を参照してください。
+Issue 対応の開始、PR / review 中の保持、安全な cleanup と再試行の運用規則は
+[`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md) を参照してください。
+状態ファイルのスキーマと低レベル CLI は
+[`docs/HERDR-TASK-STATE.md`](docs/HERDR-TASK-STATE.md) に分離されています。
 
-Issue対応開始時のWorkspace / Tab / paneの再構成は
-[`docs/HERDR-TASK-START.md`](docs/HERDR-TASK-START.md) を参照してください。
-
-Issue 対応を開始するときは、Herdr の Space / Tab を解決して状態へ記録します。
+Issue 対応を開始するときは、Herdr の Workspace / Tab を解決して状態へ記録します。
 
 ```bash
-uvx --from ./tools/herdr_task_start herdr-task-start 32
+bin/herdr-task start 32
 ```
 
 ## インストール確認
@@ -154,14 +153,15 @@ systemctl --user status herdr.service herdr-agents.service
 uv run --project tools/herdr_task_state --group dev pytest tools/herdr_task_state/tests
 uv run --project tools/herdr_task_state --group dev ruff format --check tools/herdr_task_state/src tools/herdr_task_state/tests
 uv run --project tools/herdr_task_state --group dev ruff check tools/herdr_task_state/src tools/herdr_task_state/tests
-uv run --project tools/herdr_task_start --group dev pytest tools/herdr_task_start/tests
-uv run --project tools/herdr_task_start --group dev ruff format --check tools/herdr_task_start/src tools/herdr_task_start/tests
-uv run --project tools/herdr_task_start --group dev ruff check tools/herdr_task_start/src tools/herdr_task_start/tests
+uv run --project tools/herdr_task_lifecycle --group dev pytest tools/herdr_task_lifecycle/tests
+uv run --project tools/herdr_task_lifecycle --group dev ruff format --check tools/herdr_task_lifecycle/src tools/herdr_task_lifecycle/tests
+uv run --project tools/herdr_task_lifecycle --group dev ruff check tools/herdr_task_lifecycle/src tools/herdr_task_lifecycle/tests
+bash tests/herdr_task_lifecycle_test.sh
 ```
 
-Herdr task-state CLIとIssue開始CLIは、それぞれ独立したプロジェクトとして`uvx`で実行できます。
+Herdr task-state CLI と task lifecycle CLI は、それぞれリポジトリの wrapper から実行できます。
 
 ```bash
-uvx --from ./tools/herdr_task_state herdr-task-state validate
-uvx --from ./tools/herdr_task_start herdr-task-start 32
+bin/herdr-task-state validate
+bin/herdr-task start 32
 ```

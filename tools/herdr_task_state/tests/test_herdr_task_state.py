@@ -17,6 +17,21 @@ from herdr_task_state.store import StateFileLock
 TASK_KEY = "dodo5522/ai-agent-home#30"
 
 
+def payload_with_cleanup_action(action: str) -> str:
+    return json.dumps(
+        {
+            "repository": "dodo5522/ai-agent-home",
+            "issue_number": 33,
+            "workstreams": {"main": {}},
+            "cleanup": {
+                "task_root": "/home/takashi/work/tasks/issue-33",
+                "phase": "partial",
+                "completed_actions": [action],
+            },
+        }
+    )
+
+
 @pytest.fixture
 def complete_state() -> TaskState:
     return TaskState.model_validate(
@@ -147,6 +162,185 @@ def test_workstream_constraints_are_field_level() -> None:
 def test_task_model_requires_main_workstream() -> None:
     with pytest.raises(ValidationError):
         Task(repository="dodo5522/ai-agent-home", issue_number=30, workstreams={})
+
+
+def test_task_accepts_pending_cleanup_progress() -> None:
+    task = Task.parse(
+        "dodo5522/ai-agent-home#33",
+        json.dumps(
+            {
+                "repository": "dodo5522/ai-agent-home",
+                "issue_number": 33,
+                "workstreams": {"main": {}},
+                "cleanup": {
+                    "task_root": "/home/takashi/work/tasks/issue-33",
+                    "phase": "pending",
+                    "completed_actions": [],
+                },
+            }
+        ),
+    )
+    assert task.cleanup is not None
+    assert task.cleanup.completed_actions == set()
+
+
+def test_task_accepts_partial_cleanup_without_completed_actions() -> None:
+    task = Task.parse(
+        "dodo5522/ai-agent-home#33",
+        json.dumps(
+            {
+                "repository": "dodo5522/ai-agent-home",
+                "issue_number": 33,
+                "workstreams": {"main": {}},
+                "cleanup": {
+                    "task_root": "/home/takashi/work/tasks/issue-33",
+                    "phase": "partial",
+                    "completed_actions": [],
+                    "completed_targets": {},
+                },
+            }
+        ),
+    )
+
+    assert task.cleanup is not None
+    assert task.cleanup.phase == "partial"
+    assert task.cleanup.completed_actions == set()
+    assert task.cleanup.completed_targets == {}
+
+
+def test_task_rejects_unknown_cleanup_action() -> None:
+    with pytest.raises(StateValidationError, match="cleanup"):
+        Task.parse("dodo5522/ai-agent-home#33", payload_with_cleanup_action("erase-home"))
+
+
+@pytest.mark.parametrize(
+    ("cleanup", "reason"),
+    [
+        (
+            {
+                "task_root": None,
+                "phase": "pending",
+                "completed_actions": [],
+            },
+            "null task root",
+        ),
+        (
+            {
+                "task_root": "/home/takashi/work/tasks/issue-33",
+                "phase": None,
+                "completed_actions": [],
+            },
+            "null phase",
+        ),
+        (
+            {
+                "task_root": "/home/takashi/work/tasks/issue-33",
+                "phase": "pending",
+                "completed_actions": None,
+            },
+            "null completed actions",
+        ),
+        (
+            {
+                "task_root": "relative/task-root",
+                "phase": "pending",
+                "completed_actions": [],
+            },
+            "relative task root",
+        ),
+        (
+            {
+                "task_root": "/home/takashi/work/tasks/issue-33",
+                "phase": "pending",
+                "completed_actions": ["tab", "tab"],
+            },
+            "duplicate actions",
+        ),
+        (
+            {
+                "task_root": "/home/takashi/work/tasks/issue-33",
+                "phase": "pending",
+                "completed_actions": [],
+                "completed_targets": None,
+            },
+            "null completed targets",
+        ),
+        (
+            {
+                "task_root": "/home/takashi/work/tasks/issue-33",
+                "phase": "partial",
+                "completed_actions": [],
+                "completed_targets": {"tab": ["w9:t1", "w9:t1"]},
+            },
+            "duplicate targets",
+        ),
+        (
+            {
+                "task_root": "/home/takashi/work/tasks/issue-33",
+                "phase": "partial",
+                "completed_actions": [],
+                "completed_targets": {"erase-home": ["target"]},
+            },
+            "unknown target action",
+        ),
+    ],
+    ids=lambda reason: reason,
+)
+def test_task_rejects_invalid_cleanup_progress(cleanup: dict[str, object], reason: str) -> None:
+    payload = {
+        "repository": "dodo5522/ai-agent-home",
+        "issue_number": 33,
+        "workstreams": {"main": {}},
+        "cleanup": cleanup,
+    }
+    with pytest.raises(StateValidationError, match="cleanup"):
+        Task.parse("dodo5522/ai-agent-home#33", json.dumps(payload))
+
+
+def test_cleanup_completed_actions_have_deterministic_json_order() -> None:
+    task = Task.parse(
+        "dodo5522/ai-agent-home#33",
+        payload_with_cleanup_action("worktree"),
+    )
+    assert task.cleanup is not None
+    task.cleanup.completed_actions.add("tab")
+    task.cleanup.completed_actions.add("task_root")
+
+    payload = json.loads(task.to_json())
+
+    assert payload["cleanup"]["completed_actions"] == ["tab", "worktree", "task_root"]
+
+
+def test_cleanup_completed_targets_are_typed_and_deterministically_serialized() -> None:
+    task = Task.parse(
+        "dodo5522/ai-agent-home#33",
+        json.dumps(
+            {
+                "repository": "dodo5522/ai-agent-home",
+                "issue_number": 33,
+                "workstreams": {"main": {}},
+                "cleanup": {
+                    "task_root": "/home/takashi/work/tasks/issue-33",
+                    "phase": "partial",
+                    "completed_actions": ["tab"],
+                    "completed_targets": {
+                        "worktree": ["/tmp/z", "/tmp/a"],
+                        "tab": ["w9:t2", "w9:t1"],
+                    },
+                },
+            }
+        ),
+    )
+
+    assert task.cleanup is not None
+    assert task.cleanup.completed_targets == {
+        "tab": {"w9:t1", "w9:t2"},
+        "worktree": {"/tmp/a", "/tmp/z"},
+    }
+    assert json.loads(task.to_json())["cleanup"]["completed_targets"] == {
+        "tab": ["w9:t1", "w9:t2"],
+        "worktree": ["/tmp/a", "/tmp/z"],
+    }
 
 
 def test_state_file_lock_releases_after_action_failure(tmp_path: Path) -> None:

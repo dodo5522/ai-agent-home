@@ -3,9 +3,9 @@
 This document is the operator reference for the versioned task-state store used
 by the Herdr automation. It describes persistent identity and runtime
 references only. It does not create, rename, focus, or delete Herdr resources.
-The full Space/Tab lifecycle tables belong to
-[`docs/HERDR-WORK-MANAGEMENT.md`](HERDR-WORK-MANAGEMENT.md), owned by Issue
-#33.
+The full resource lifecycle tables and operational rules belong to
+[`HERDR-TASK-LIFECYCLE.md`](HERDR-TASK-LIFECYCLE.md). This state reference does
+not repeat them.
 
 ## Stable identity
 
@@ -54,6 +54,7 @@ resources exist.
 | Stable identity | `workstreams.main` | Required primary workstream object. |
 | Stable identity | workstream slug | `main` or a lower-case parallel-workstream slug. |
 | Descriptive | `title` | Optional Issue title. |
+| Runtime cleanup | `cleanup` | Optional resumable cleanup-progress record. |
 | Runtime reference | `herdr.workspace_id` | Herdr workspace identifier, when known. |
 | Runtime reference | `herdr.workspace_label` | Optional Herdr workspace label. |
 | Runtime reference | `tab_id`, `tab_label` | Optional workstream Tab identifier and label. |
@@ -67,6 +68,27 @@ belongs to this task. Before mutating anything, callers must validate Herdr IDs
 against live Herdr state (and validate Git worktree and branch references with
 Git). A stale identifier remains valid stored data until a reconciler decides
 what to do with it.
+
+### Cleanup progress
+
+`cleanup` is optional. When omitted, the task is active and no cleanup has
+started. When present, it is a runtime record with these required fields:
+
+| Field | Valid values | Meaning |
+| --- | --- | --- |
+| `task_root` | Absolute path | The resolved task root approved for this cleanup run. |
+| `phase` | `pending`, `partial` | Cleanup has not yet completed, or stopped after recorded progress. |
+| `completed_actions` | Set of `tab`, `worktree`, and `task_root` | Actions already completed or found absent. |
+| `completed_targets` | Optional action-to-identifier sets | Individual targets completed or found absent within an unfinished action. |
+
+Completed actions are serialized in lifecycle action order: `tab`, `worktree`,
+then `task_root`; completed targets are serialized in the same action order with
+sorted identifiers. The record must not use null values, duplicate action names,
+or duplicate target identifiers. `partial` may have no completed action when the
+first cleanup target failed. Lifecycle code deletes the cleanup record together
+with the task mapping only after cleanup has completed. For the operational
+cleanup, approval, and retry procedure, see
+[`HERDR-TASK-LIFECYCLE.md`](HERDR-TASK-LIFECYCLE.md).
 
 Unknown fields inside recognized objects are allowed for forward-compatible
 metadata. Changing the meaning or type of an existing field requires a new

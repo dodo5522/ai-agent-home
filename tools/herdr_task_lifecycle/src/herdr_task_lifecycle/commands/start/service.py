@@ -1,4 +1,4 @@
-"""Issue-start reconciliation workflow for Herdr-managed resources."""
+"""Start-command reconciliation workflow for Herdr-managed resources."""
 
 import os
 from dataclasses import dataclass
@@ -14,10 +14,10 @@ from herdr_task_state.model import (
 )
 from herdr_task_state.store import StateFilesystemError, StateStore
 
-from .errors import TaskStartError
-from .herdr import CreatedResources, HerdrClient, WorkspaceInfo, _HerdrOperations
-from .identity import load_issue_title, resolve_repository, short_title
-from .runner import CommandRunner, SubprocessRunner
+from ...errors import LifecycleError
+from ...herdr import CreatedResources, HerdrClient, WorkspaceInfo, _HerdrOperations
+from ...identity import load_issue_title, resolve_repository, short_title
+from ...runner import CommandRunner, SubprocessRunner
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ class TaskStarter:
         try:
             return self._store.read()
         except (StateFilesystemError, StateValidationError) as error:
-            raise TaskStartError("cannot read task state") from error
+            raise LifecycleError("cannot read task state") from error
 
     def _workspace_for_repository(
         self, state: TaskState, repository: str, cwd: Path
@@ -67,12 +67,12 @@ class TaskStarter:
         for workspace_id in candidates:
             try:
                 workspace = self._herdr.workspace_get(workspace_id)
-            except TaskStartError:
+            except LifecycleError:
                 continue
             if workspace.label == repository:
                 valid.append(workspace)
         if len(valid) > 1:
-            raise TaskStartError("multiple managed workspaces match repository")
+            raise LifecycleError("multiple managed workspaces match repository")
         if valid:
             return valid[0].workspace_id, None
         created = self._herdr.workspace_create(repository, cwd)
@@ -91,13 +91,13 @@ class TaskStarter:
             return None
         try:
             tab = self._herdr.tab_get(tab_id)
-        except TaskStartError:
+        except LifecycleError:
             return None
         if tab.workspace_id != workspace_id or tab.label != label:
             return None
         panes = self._herdr.panes_for_workspace(workspace_id, tab_id)
         if len(panes) != 1:
-            raise TaskStartError("managed tab must contain exactly one pane")
+            raise LifecycleError("managed tab must contain exactly one pane")
         stored_pane_id = (task.workstreams["main"].pane_ids or {}).get("root")
         if stored_pane_id is not None and panes[0].pane_id != stored_pane_id:
             return None
@@ -108,17 +108,17 @@ class TaskStarter:
     ) -> tuple[str, str]:
         panes = self._herdr.panes_for_workspace(workspace_id, created.tab_id)
         if len(panes) != 1 or panes[0].pane_id != created.pane_id:
-            raise TaskStartError("created tab must contain exactly one root pane")
+            raise LifecycleError("created tab must contain exactly one root pane")
         return created.tab_id, created.pane_id
 
     def start(self, issue_number: int, cwd: Path) -> TaskStartResolution:
         """Resolve an Issue and reconcile its managed Herdr resources."""
         if os.environ.get("HERDR_ENV") != "1":
-            raise TaskStartError("HERDR_ENV=1 is required")
+            raise LifecycleError("HERDR_ENV=1 is required")
         if issue_number <= 0:
-            raise TaskStartError("Issue number must be positive")
+            raise LifecycleError("Issue number must be positive")
         if not cwd.is_absolute() or not cwd.is_dir():
-            raise TaskStartError("cwd must be an absolute directory")
+            raise LifecycleError("cwd must be an absolute directory")
 
         repository = resolve_repository(cwd, self._runner)
         title = load_issue_title(repository, issue_number, self._runner)
@@ -134,7 +134,7 @@ class TaskStarter:
                 created_workspace_id = workspace_id
                 renamed = self._herdr.tab_rename(created_workspace.tab_id, tab_label)
                 if renamed.workspace_id != workspace_id or renamed.label != tab_label:
-                    raise TaskStartError("created tab identity mismatch")
+                    raise LifecycleError("created tab identity mismatch")
                 tab_id, pane_id = self._validate_created_tab(workspace_id, created_workspace)
             else:
                 existing = self._validate_existing_tab(current, workspace_id, tab_label)
@@ -172,17 +172,20 @@ class TaskStarter:
                     "workstreams": {**task.workstreams, "main": updated_main},
                 }
             )
-            stored = self._store.put(str(task_key), updated)
+            try:
+                stored = self._store.put(str(task_key), updated)
+            except (StateFilesystemError, StateValidationError) as error:
+                raise LifecycleError("cannot write task state") from error
             return TaskStartResolution(stored, task_key, workspace_id, tab_id, pane_id, cwd)
         except Exception:
             if created_workspace_id is not None:
                 try:
                     self._herdr.workspace_close(created_workspace_id)
-                except TaskStartError:
+                except LifecycleError:
                     pass
             elif created_tab_id is not None:
                 try:
                     self._herdr.tab_close(created_tab_id)
-                except TaskStartError:
+                except LifecycleError:
                     pass
             raise

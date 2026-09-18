@@ -29,6 +29,8 @@ When the user reports that a Pull Request has been merged:
 - Switch to `main`.
 - Pull the latest changes from `origin/main` using fast-forward only.
 - Confirm that the local `main` matches `origin/main`.
+- Follow the cleanup plan, approval, execution, and retry process in
+  [`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md).
 
 ## Workspace location
 
@@ -42,17 +44,14 @@ When creating additional working data:
 
 ## Task workspace cleanup
 
-When the user reports that a Pull Request has been merged, first complete the post-merge `main` synchronization, then clean up that task's workspace. For work without a Pull Request, clean it up after the user confirms that the task is complete.
-
-Before cleanup:
-
-- Resolve and display the exact task-root path.
-- Confirm that the resolved path is strictly below `/home/takashi/work/tasks/` and is neither `/home/takashi/work` nor `/home/takashi/work/tasks` itself.
-- Confirm that the `.codex-task-root` marker exists directly inside the resolved task root.
-- Confirm that no Git worktree registered by any repository is actively using a path inside the task root.
-- Request one approval for recursively deleting the entire task root; do not request approval separately for each contained file or directory.
-
-After approval, delete the task root in one operation and report the deleted path and whether recovery is possible.
+The canonical resource roles, retention triggers, managed-resource boundary,
+and exact cleanup procedure are in
+[`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md). Keep the Tab,
+worktree, task root, and state mapping while a Pull Request is open or under
+review. For non-PR work, wait for explicit user completion confirmation.
+Always show a fresh `herdr-task cleanup ISSUE --plan`, obtain human approval,
+and use the plan's exact task root for guarded execution. Never clean up
+unmanaged or another task's resources.
 
 ## Commit policy
 
