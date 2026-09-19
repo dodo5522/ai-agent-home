@@ -608,6 +608,80 @@ def test_legacy_tab_label_is_renamed_without_duplicate_create(start_fixture: Sta
     assert start_fixture.herdr.count_calls("tab", "create") == 0
 
 
+def test_legacy_tab_with_a_different_root_pane_is_not_renamed(start_fixture: StartFixture) -> None:
+    start_fixture.write_state_with_ids("w9", "w9:t2", "w9:p3", tab_label="32 Herdr task-start")
+    start_fixture.make_managed_tab("w9", "w9:t2", "w9:p4", "32 Herdr task-start")
+
+    result = start_fixture.run(32)
+
+    assert result.tab_id == "w9:t3"
+    assert start_fixture.herdr.tabs["w9:t2"].label == "32 Herdr task-start"
+    assert start_fixture.herdr.count_calls("tab", "rename") == 0
+    assert start_fixture.herdr.count_calls("tab", "create") == 1
+
+
+def test_legacy_tab_with_multiple_panes_fails_without_rename(
+    start_fixture: StartFixture,
+) -> None:
+    start_fixture.write_state_with_ids("w9", "w9:t2", "w9:p3", tab_label="32 Herdr task-start")
+    start_fixture.make_managed_tab("w9", "w9:t2", "w9:p3", "32 Herdr task-start")
+    start_fixture.herdr.set_panes("w9:t2", ["w9:p3", "w9:p4"])
+
+    with pytest.raises(LifecycleError, match="exactly one pane"):
+        start_fixture.run(32)
+
+    assert start_fixture.herdr.tabs["w9:t2"].label == "32 Herdr task-start"
+    assert start_fixture.herdr.count_calls("tab", "rename") == 0
+
+
+def test_worktree_owned_by_another_issue_is_rejected_before_herdr_mutation(
+    start_fixture: StartFixture,
+) -> None:
+    start_fixture.run(32)
+    before_state = start_fixture.state_bytes()
+    before_calls = list(start_fixture.herdr.calls)
+    start_fixture.runner.respond_to_issue_lookup(
+        returncode=0,
+        stdout=json.dumps({"title": "Another Herdr task"}),
+    )
+
+    with pytest.raises(LifecycleError, match="already registered"):
+        start_fixture.run(33)
+
+    assert start_fixture.state_bytes() == before_state
+    assert start_fixture.herdr.calls == before_calls
+
+
+def test_worktree_owned_by_another_workstream_is_rejected_before_herdr_mutation(
+    start_fixture: StartFixture,
+) -> None:
+    start_fixture.run(32)
+    current = start_fixture.state().tasks["dodo5522/ai-agent-home#32"]
+    current = current.model_copy(
+        update={
+            "workstreams": {
+                **current.workstreams,
+                "review": Workstream(worktree=str(start_fixture.worktree)),
+            }
+        }
+    )
+    start_fixture.state_path.write_text(
+        TaskState(
+            version=1,
+            tasks={"dodo5522/ai-agent-home#32": current},
+        ).to_json(),
+        encoding="utf-8",
+    )
+    before_state = start_fixture.state_bytes()
+    before_calls = list(start_fixture.herdr.calls)
+
+    with pytest.raises(LifecycleError, match="already registered"):
+        start_fixture.run(32)
+
+    assert start_fixture.state_bytes() == before_state
+    assert start_fixture.herdr.calls == before_calls
+
+
 def test_different_registered_worktree_is_rejected_without_herdr_mutation(
     start_fixture: StartFixture,
 ) -> None:

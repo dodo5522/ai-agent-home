@@ -92,7 +92,8 @@ The command creates or reuses resources by stored ID, uses `--no-focus` for
 background creation, validates that the managed Tab has exactly one initial
 root Pane, and atomically records the successful IDs, resolved worktree path,
 and branch. Re-running `start` requires that recorded main-workstream path and
-branch to match; it does not replace them with another worktree. A failed
+branch to match; it does not replace them with another worktree. It also rejects
+a worktree already registered to another task or workstream. A failed
 invocation rolls back only resources it created during that invocation and
 preserves previously managed resources. Read-only `herdr-task-state`
 operations never create Herdr resources.

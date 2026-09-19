@@ -99,20 +99,21 @@ class TaskStarter:
             return None
         if tab.workspace_id != workspace_id:
             return None
-        if tab.label != label:
-            stored_label = task.workstreams["main"].tab_label
-            if tab.label != legacy_label or stored_label != legacy_label:
-                return None
-            renamed = self._herdr.tab_rename(tab_id, label)
-            if renamed.workspace_id != workspace_id or renamed.label != label:
-                raise LifecycleError("managed tab identity mismatch after rename")
-            tab = renamed
+        is_current_label = tab.label == label
+        stored_label = task.workstreams["main"].tab_label
+        is_legacy_label = tab.label == legacy_label and stored_label == legacy_label
+        if not is_current_label and not is_legacy_label:
+            return None
         panes = self._herdr.panes_for_workspace(workspace_id, tab_id)
         if len(panes) != 1:
             raise LifecycleError("managed tab must contain exactly one pane")
         stored_pane_id = (task.workstreams["main"].pane_ids or {}).get("root")
         if stored_pane_id is not None and panes[0].pane_id != stored_pane_id:
             return None
+        if is_legacy_label:
+            renamed = self._herdr.tab_rename(tab_id, label)
+            if renamed.workspace_id != workspace_id or renamed.label != label:
+                raise LifecycleError("managed tab identity mismatch after rename")
         return tab_id, panes[0].pane_id
 
     def _validate_created_tab(
@@ -122,6 +123,18 @@ class TaskStarter:
         if len(panes) != 1 or panes[0].pane_id != created.pane_id:
             raise LifecycleError("created tab must contain exactly one root pane")
         return created.tab_id, created.pane_id
+
+    @staticmethod
+    def _validate_worktree_ownership(state: TaskState, task_key: TaskKey, worktree: Path) -> None:
+        for key, task in state.tasks.items():
+            for workstream_name, workstream in task.workstreams.items():
+                if key == str(task_key) and workstream_name == "main":
+                    continue
+                if (
+                    workstream.worktree is not None
+                    and Path(workstream.worktree).resolve() == worktree
+                ):
+                    raise LifecycleError("worktree is already registered by another workstream")
 
     def start(self, issue_number: int, cwd: Path) -> TaskStartResolution:
         """Resolve an Issue and reconcile its managed Herdr resources."""
@@ -147,6 +160,7 @@ class TaskStarter:
                 raise LifecycleError("main workstream has a different worktree")
             if main.branch is not None and main.branch != registration.branch:
                 raise LifecycleError("main workstream has a different branch")
+        self._validate_worktree_ownership(state, task_key, registration.path)
         created_workspace_id: str | None = None
         created_tab_id: str | None = None
         try:
