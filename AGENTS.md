@@ -78,6 +78,15 @@ Generated-by: Codex
 - Do not embed GitHub access tokens in Git remote URLs.
 - Use the configured Git credential helper or GitHub App authentication.
 
+## GitHub CLI authentication
+
+- For every `gh` command, obtain an ephemeral GitHub App token with
+  `bin/get-github-app-token.py` and pass it only through the command's
+  environment, for example:
+  `GH_TOKEN="$(bin/get-github-app-token.py)" gh pr view ...`.
+- Do not use `gh auth login`, persist the token, include it in command
+  arguments, or print it in command output or diagnostics.
+
 ## Implementation language and dependency policy
 
 When adding a tool or automation with non-trivial logic:
