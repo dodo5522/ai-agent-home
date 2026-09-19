@@ -19,8 +19,8 @@ stable key.
 
 | Resource | Role and identifier | Label or metadata | cwd |
 | --- | --- | --- | --- |
-| Workspace | One repository container; stored Herdr workspace ID. | `owner/name` | Repository or Issue worktree passed to `start`. |
-| Main Tab | Primary Issue workstream; stored Herdr Tab ID. | `<issue-number> <short-title>` | The resolved `start --cwd` path. |
+| Workspace | One repository container; stored Herdr workspace ID. | `owner/name` | The validated Issue worktree passed to `start`. |
+| Main Tab | Primary Issue workstream; stored Herdr Tab ID. | `#<issue-number> <short-title>` | The resolved `start --cwd` worktree path. |
 | Parallel Tab | Independent future workstream; stored Herdr Tab ID. | `#<issue-number>/<workstream> <short-title>` | That workstream's registered worktree. |
 | Pane | One concurrent role in a Tab; stored by role to Herdr Pane ID. | Initial role key `root`; future roles include `implementer`, `reviewer`, `shell`, `test`, `server`, and `logs`. | The Tab worktree unless that role explicitly needs another path. |
 | Agent | One top-level Agent per Agent Pane; stored by role with its unique Agent name and optional Codex session ID. | A task-unique name plus the role; no global naming format is implemented yet. | Inherits its Pane cwd. |
@@ -32,7 +32,7 @@ stable key.
 
 | Event | Required behavior |
 | --- | --- |
-| Issue work starts | Run `bin/herdr-task start ISSUE`; create or reuse the state-recorded repository Workspace and main Issue Tab. |
+| Issue work starts | Create the Issue feature worktree below its marked task root, then run `bin/herdr-task start ISSUE --cwd WORKTREE`; validate and record its path and branch before creating or reusing the state-recorded Workspace and main Issue Tab. |
 | Independent workstream becomes necessary | Future `pane`/workstream support may add one parallel Tab and worktree. Do not create one merely for another process in the same workstream. |
 | Concurrent reviewer, server, logs, shell, or test role becomes necessary | Future `pane` support may add a role Pane to the existing Tab. Keep one top-level Agent per Agent Pane. |
 | PR opens or remains under review | Keep the same Issue task, Tab, worktree, task root, and state mapping. PR metadata is attached to its workstream; it does not start a replacement task. |
@@ -59,6 +59,12 @@ created manually or absent from state remains unmanaged even when its label
 looks identical. A resource recorded only for another task cannot be adopted,
 except for the validated same-repository Workspace described above.
 
+The first `start` after this lifecycle version may rename a state-recorded Tab
+from the previous `<issue-number> <short-title>` form to the current
+`#<issue-number> <short-title>` form only when both its stored and live labels
+exactly match that previous form. A manually changed label is never adopted or
+renamed by this migration.
+
 `cleanup` considers only the current task's state-recorded Tabs and worktrees
 and their one validated task root. It never closes the repository Workspace,
 deletes an unmanaged Herdr resource, removes a primary checkout, or removes a
@@ -66,16 +72,15 @@ different task's data.
 
 ## Starting an Issue task
 
-Run from a Herdr-managed Pane:
+Run from a Herdr-managed Pane after creating the Issue feature worktree under
+one direct `.codex-task-root` marker below `/home/takashi/work/tasks/`. The
+`--cwd` path must be the root of a registered non-primary Git worktree with an
+attached local branch; the primary checkout, detached HEAD, marker-free paths,
+and paths outside that task-root boundary are rejected before any Herdr or
+state mutation.
 
 ```bash
-bin/herdr-task start 32
-```
-
-To resolve another repository or Issue-worktree directory, supply it explicitly:
-
-```bash
-bin/herdr-task start 32 --cwd /absolute/path/to/repository
+bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 ```
 
 `start` requires `HERDR_ENV=1`. It resolves the lower-case `owner/name` from
@@ -85,11 +90,13 @@ and raw command output are never included in diagnostics.
 
 The command creates or reuses resources by stored ID, uses `--no-focus` for
 background creation, validates that the managed Tab has exactly one initial
-root Pane, and atomically records the successful IDs. A failed invocation
-rolls back only resources it created during that invocation and preserves
-previously managed resources. Re-running `start` reconciles the same task
-without creating duplicate resources. Read-only `herdr-task-state` operations
-never create Herdr resources.
+root Pane, and atomically records the successful IDs, resolved worktree path,
+and branch. Re-running `start` requires that recorded main-workstream path and
+branch to match; it does not replace them with another worktree. It also rejects
+a worktree already registered to another task or workstream. A failed
+invocation rolls back only resources it created during that invocation and
+preserves previously managed resources. Read-only `herdr-task-state`
+operations never create Herdr resources.
 
 ## Planning and approving cleanup
 

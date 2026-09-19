@@ -41,6 +41,7 @@ When creating additional working data:
 - Place all Git worktrees, cloned repositories, and agent-managed temporary data for that task inside its task root, using subdirectories such as `worktree/`, `repo/`, and `tmp/`.
 - Do not create these resources outside the task root unless the user explicitly requests another location or a tool requires a system-managed temporary location.
 - Keep the task root while its Pull Request is open or may still receive review updates.
+- For Issue implementation, create the feature worktree under the marked task root, then run `bin/herdr-task start ISSUE --cwd WORKTREE` before creating implementation or investigation artifacts. The cwd must be the root of a registered non-primary Git worktree with an attached branch; do not use the primary checkout or a detached worktree.
 
 ## Task workspace cleanup
 
@@ -76,6 +77,15 @@ Generated-by: Codex
 - Never commit secrets, tokens, private keys, `.pem` files, or credentials.
 - Do not embed GitHub access tokens in Git remote URLs.
 - Use the configured Git credential helper or GitHub App authentication.
+
+## GitHub CLI authentication
+
+- For every `gh` command, obtain an ephemeral GitHub App token with
+  `bin/get-github-app-token.py` and pass it only through the command's
+  environment, for example:
+  `GH_TOKEN="$(bin/get-github-app-token.py)" gh pr view ...`.
+- Do not use `gh auth login`, persist the token, include it in command
+  arguments, or print it in command output or diagnostics.
 
 ## Implementation language and dependency policy
 

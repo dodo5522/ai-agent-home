@@ -108,10 +108,12 @@ Issue 対応の開始、PR / review 中の保持、安全な cleanup と再試�
 状態ファイルのスキーマと低レベル CLI は
 [`docs/HERDR-TASK-STATE.md`](docs/HERDR-TASK-STATE.md) に分離されています。
 
-Issue 対応を開始するときは、Herdr の Workspace / Tab を解決して状態へ記録します。
+Issue 対応では、marked task root配下にfeature worktreeを作成してから、Herdrの
+Workspace / Tab とworktree / branchを状態へ記録します。詳細な境界・再実行・
+cleanup規則は上記のライフサイクル文書を参照してください。
 
 ```bash
-bin/herdr-task start 32
+bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 ```
 
 ## インストール確認
@@ -163,5 +165,5 @@ Herdr task-state CLI と task lifecycle CLI は、それぞれリポジトリの
 
 ```bash
 bin/herdr-task-state validate
-bin/herdr-task start 32
+bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 ```

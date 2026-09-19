@@ -11,6 +11,10 @@ rg -Uq 'repository-wide managed resource shared by tasks in the same[[:space:]]+
 rg -q 'does not bind execution to the previously displayed plan' \
     docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'herdr-task cleanup ISSUE --plan' AGENTS.md
+rg -q 'non-primary Git worktree' docs/HERDR-TASK-LIFECYCLE.md
+rg -q 'worktree.*branch' docs/HERDR-TASK-LIFECYCLE.md
+rg -q '#<issue-number> <short-title>' docs/HERDR-TASK-LIFECYCLE.md
+rg -q 'create.*worktree.*then.*herdr-task start' AGENTS.md
 test ! -e docs/HERDR-TASK-START.md
 test ! -e bin/herdr-task-start
 test ! -d tools/herdr_task_start

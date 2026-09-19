@@ -69,6 +69,10 @@ against live Herdr state (and validate Git worktree and branch references with
 Git). A stale identifier remains valid stored data until a reconciler decides
 what to do with it.
 
+`herdr-task start` is the current writer for the main workstream's worktree
+and branch references. Its full validation, reconciliation, and managed
+resource rules are defined in [`HERDR-TASK-LIFECYCLE.md`](HERDR-TASK-LIFECYCLE.md).
+
 ### Cleanup progress
 
 `cleanup` is optional. When omitted, the task is active and no cleanup has
