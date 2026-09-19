@@ -157,11 +157,76 @@ class StartFixture:
     runner: RecordingRunner
     herdr: FakeHerdr
     state_path: Path
+    tasks_directory: Path
+    task_root: Path
+    worktree: Path
+    git_common_dir: Path
+    git_dir: Path
+    primary_worktree: Path
+    branch: str = "feat/issue-32-herdr-task-start"
 
-    def run(self, issue_number: int = 32) -> TaskStartResolution:
-        return TaskStarter(self.state_path, runner=self.runner, herdr=self.herdr).start(
-            issue_number, self.tmp_path
+    def run(self, issue_number: int = 32, cwd: Path | None = None) -> TaskStartResolution:
+        return TaskStarter(
+            self.state_path,
+            runner=self.runner,
+            herdr=self.herdr,
+            task_roots_directory=self.tasks_directory,
+        ).start(issue_number, cwd or self.worktree)
+
+    def git_command(self, cwd: Path, *arguments: str) -> list[str]:
+        return ["git", "-C", str(cwd), *arguments]
+
+    def respond_worktree(
+        self,
+        cwd: Path,
+        branch: str | None,
+        *,
+        git_dir: Path | None = None,
+        inventory: str | None = None,
+    ) -> None:
+        self.runner.respond(
+            self.git_command(cwd, "rev-parse", "--git-dir"),
+            CommandResult(0, f"{git_dir or self.git_dir}\n", ""),
         )
+        self.runner.respond(
+            self.git_command(cwd, "rev-parse", "--git-common-dir"),
+            CommandResult(0, f"{self.git_common_dir}\n", ""),
+        )
+        self.runner.respond(
+            self.git_command(cwd, "symbolic-ref", "--quiet", "--short", "HEAD"),
+            CommandResult(0 if branch else 1, f"{branch}\n" if branch else "", ""),
+        )
+        self.runner.respond(
+            self.git_command(cwd, "worktree", "list", "--porcelain"),
+            CommandResult(0, inventory or self.inventory(cwd, branch or "main"), ""),
+        )
+
+    def inventory(self, cwd: Path, branch: str) -> str:
+        return (
+            f"worktree {self.primary_worktree}\n"
+            f"HEAD {'0' * 40}\n"
+            "branch refs/heads/main\n\n"
+            f"worktree {cwd}\n"
+            f"HEAD {'1' * 40}\n"
+            f"branch refs/heads/{branch}\n"
+        )
+
+    def use_second_valid_worktree(self, branch: str) -> Path:
+        worktree = self.task_root / "replacement-worktree"
+        worktree.mkdir()
+        git_dir = self.git_common_dir / "worktrees" / "replacement"
+        git_dir.mkdir(parents=True)
+        self.respond_worktree(worktree, branch, git_dir=git_dir)
+        self.runner.respond(
+            self.git_command(worktree, "remote", "get-url", "origin"),
+            CommandResult(0, "git@github.com:Dodo5522/Ai-Agent-Home.git\n", ""),
+        )
+        return worktree
+
+    def make_managed_tab(self, workspace_id: str, tab_id: str, pane_id: str, label: str) -> None:
+        self.herdr.workspaces[workspace_id] = WorkspaceInfo(workspace_id, "dodo5522/ai-agent-home")
+        self.herdr.tabs[tab_id] = TabInfo(tab_id, workspace_id, label)
+        self.herdr.set_panes(tab_id, [pane_id])
 
     def state(self) -> TaskState:
         return StateStore(self.state_path).read()
@@ -170,7 +235,12 @@ class StartFixture:
         return self.state_path.read_bytes() if self.state_path.exists() else b""
 
     def write_state_with_ids(
-        self, workspace_id: str, tab_id: str, pane_id: str, issue_number: int = 32
+        self,
+        workspace_id: str,
+        tab_id: str,
+        pane_id: str,
+        issue_number: int = 32,
+        tab_label: str = "old tab",
     ) -> None:
         task = Task(
             repository="dodo5522/ai-agent-home",
@@ -182,7 +252,7 @@ class StartFixture:
             workstreams={
                 "main": Workstream(
                     tab_id=tab_id,
-                    tab_label="old tab",
+                    tab_label=tab_label,
                     pane_ids={"root": pane_id},
                 )
             },
@@ -198,15 +268,36 @@ class StartFixture:
 def start_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> StartFixture:
     monkeypatch.setenv("HERDR_ENV", "1")
     runner = RecordingRunner()
+    tasks_directory = tmp_path / "tasks"
+    task_root = tasks_directory / "issue-32"
+    worktree = task_root / "worktree"
+    worktree.mkdir(parents=True)
+    (task_root / ".codex-task-root").touch()
+    git_common_dir = tmp_path / "repository" / ".git"
+    git_dir = git_common_dir / "worktrees" / "issue-32"
+    git_dir.mkdir(parents=True)
+    fixture = StartFixture(
+        tmp_path=tmp_path,
+        runner=runner,
+        herdr=FakeHerdr(),
+        state_path=tmp_path / "state.json",
+        tasks_directory=tasks_directory,
+        task_root=task_root,
+        worktree=worktree,
+        git_common_dir=git_common_dir,
+        git_dir=git_dir,
+        primary_worktree=tmp_path / "repository",
+    )
+    fixture.respond_worktree(worktree, fixture.branch)
     runner.respond(
-        ["git", "-C", str(tmp_path), "remote", "get-url", "origin"],
+        ["git", "-C", str(worktree), "remote", "get-url", "origin"],
         CommandResult(0, "git@github.com:Dodo5522/Ai-Agent-Home.git\n", ""),
     )
     runner.respond(
         ["gh", "issue", "view", "32", "--repo", "dodo5522/ai-agent-home", "--json", "title"],
         CommandResult(0, json.dumps({"title": "Herdr task-start"}), ""),
     )
-    return StartFixture(tmp_path, runner, FakeHerdr(), tmp_path / "state.json")
+    return fixture
 
 
 def test_resolve_repository_accepts_https_and_ssh_remotes() -> None:
@@ -484,6 +575,89 @@ def test_first_start_creates_and_persists(start_fixture: StartFixture) -> None:
     assert result.pane_id == "w9:p3"
     assert result.task.workstreams["main"].pane_ids == {"root": "w9:p3"}
     assert start_fixture.state().tasks["dodo5522/ai-agent-home#32"] == result.task
+
+
+def test_first_start_persists_worktree_branch_and_hash_label(start_fixture: StartFixture) -> None:
+    result = start_fixture.run(32)
+    main = result.task.workstreams["main"]
+
+    assert main.worktree == str(start_fixture.worktree)
+    assert main.branch == "feat/issue-32-herdr-task-start"
+    assert main.tab_label == "#32 Herdr task-start"
+
+
+def test_legacy_task_is_upgraded_with_worktree_registration(start_fixture: StartFixture) -> None:
+    start_fixture.write_state_with_ids("w9", "w9:t2", "w9:p3")
+    start_fixture.make_managed_tab("w9", "w9:t2", "w9:p3", "#32 Herdr task-start")
+
+    result = start_fixture.run(32)
+
+    assert result.task.workstreams["main"].worktree == str(start_fixture.worktree)
+    assert result.task.workstreams["main"].branch == "feat/issue-32-herdr-task-start"
+
+
+def test_legacy_tab_label_is_renamed_without_duplicate_create(start_fixture: StartFixture) -> None:
+    start_fixture.write_state_with_ids("w9", "w9:t2", "w9:p3", tab_label="32 Herdr task-start")
+    start_fixture.make_managed_tab("w9", "w9:t2", "w9:p3", "32 Herdr task-start")
+
+    result = start_fixture.run(32)
+
+    assert result.tab_id == "w9:t2"
+    assert result.task.workstreams["main"].tab_label == "#32 Herdr task-start"
+    assert start_fixture.herdr.count_calls("tab", "rename") == 1
+    assert start_fixture.herdr.count_calls("tab", "create") == 0
+
+
+def test_different_registered_worktree_is_rejected_without_herdr_mutation(
+    start_fixture: StartFixture,
+) -> None:
+    start_fixture.run(32)
+    before_state = start_fixture.state_bytes()
+    before_calls = list(start_fixture.herdr.calls)
+    replacement = start_fixture.use_second_valid_worktree("feat/issue-32-replacement")
+
+    with pytest.raises(LifecycleError, match="different worktree"):
+        start_fixture.run(32, replacement)
+
+    assert start_fixture.state_bytes() == before_state
+    assert start_fixture.herdr.calls == before_calls
+
+
+def test_different_branch_is_rejected_without_herdr_mutation(start_fixture: StartFixture) -> None:
+    start_fixture.run(32)
+    before_state = start_fixture.state_bytes()
+    before_calls = list(start_fixture.herdr.calls)
+    start_fixture.respond_worktree(start_fixture.worktree, "feat/issue-32-replacement")
+
+    with pytest.raises(LifecycleError, match="different branch"):
+        start_fixture.run(32)
+
+    assert start_fixture.state_bytes() == before_state
+    assert start_fixture.herdr.calls == before_calls
+
+
+@pytest.mark.parametrize("invalid", ["primary", "detached", "unmarked"])
+def test_invalid_worktree_is_rejected_before_herdr_mutation(
+    start_fixture: StartFixture,
+    invalid: str,
+) -> None:
+    before_calls = list(start_fixture.herdr.calls)
+    if invalid == "primary":
+        start_fixture.respond_worktree(
+            start_fixture.worktree,
+            "main",
+            git_dir=start_fixture.git_common_dir,
+        )
+    elif invalid == "detached":
+        start_fixture.respond_worktree(start_fixture.worktree, None)
+    else:
+        (start_fixture.task_root / ".codex-task-root").unlink()
+
+    with pytest.raises(LifecycleError):
+        start_fixture.run(32)
+
+    assert not start_fixture.state_path.exists()
+    assert start_fixture.herdr.calls == before_calls
 
 
 def test_second_start_reuses_without_duplicate_create(start_fixture: StartFixture) -> None:

@@ -18,6 +18,7 @@ from ...errors import LifecycleError
 from ...herdr import CreatedResources, HerdrClient, WorkspaceInfo, _HerdrOperations
 from ...identity import load_issue_title, resolve_repository, short_title
 from ...runner import CommandRunner, SubprocessRunner
+from ...worktree import TASK_ROOTS_DIRECTORY, resolve_managed_worktree
 
 
 @dataclass(frozen=True)
@@ -40,10 +41,12 @@ class TaskStarter:
         state_path: Path,
         runner: CommandRunner | None = None,
         herdr: _HerdrOperations | None = None,
+        task_roots_directory: Path = TASK_ROOTS_DIRECTORY,
     ) -> None:
         self._runner = runner or SubprocessRunner()
         self._herdr = herdr or HerdrClient(self._runner)
         self._store = StateStore(state_path)
+        self._task_roots_directory = task_roots_directory
 
     def _read_state(self) -> TaskState:
         if not self._store.path.exists() and not self._store.path.is_symlink():
@@ -83,6 +86,7 @@ class TaskStarter:
         task: Task | None,
         workspace_id: str,
         label: str,
+        legacy_label: str,
     ) -> tuple[str, str] | None:
         if task is None:
             return None
@@ -93,8 +97,16 @@ class TaskStarter:
             tab = self._herdr.tab_get(tab_id)
         except LifecycleError:
             return None
-        if tab.workspace_id != workspace_id or tab.label != label:
+        if tab.workspace_id != workspace_id:
             return None
+        if tab.label != label:
+            stored_label = task.workstreams["main"].tab_label
+            if tab.label != legacy_label or stored_label != legacy_label:
+                return None
+            renamed = self._herdr.tab_rename(tab_id, label)
+            if renamed.workspace_id != workspace_id or renamed.label != label:
+                raise LifecycleError("managed tab identity mismatch after rename")
+            tab = renamed
         panes = self._herdr.panes_for_workspace(workspace_id, tab_id)
         if len(panes) != 1:
             raise LifecycleError("managed tab must contain exactly one pane")
@@ -120,12 +132,21 @@ class TaskStarter:
         if not cwd.is_absolute() or not cwd.is_dir():
             raise LifecycleError("cwd must be an absolute directory")
 
+        registration = resolve_managed_worktree(cwd, self._runner, self._task_roots_directory)
+        cwd = registration.path
         repository = resolve_repository(cwd, self._runner)
         title = load_issue_title(repository, issue_number, self._runner)
         task_key = TaskKey(repository, issue_number)
-        tab_label = f"{issue_number} {short_title(title)}"
+        tab_label = f"#{issue_number} {short_title(title)}"
+        legacy_tab_label = f"{issue_number} {short_title(title)}"
         state = self._read_state()
         current = state.tasks.get(str(task_key))
+        if current is not None:
+            main = current.workstreams["main"]
+            if main.worktree is not None and Path(main.worktree).resolve() != registration.path:
+                raise LifecycleError("main workstream has a different worktree")
+            if main.branch is not None and main.branch != registration.branch:
+                raise LifecycleError("main workstream has a different branch")
         created_workspace_id: str | None = None
         created_tab_id: str | None = None
         try:
@@ -137,7 +158,12 @@ class TaskStarter:
                     raise LifecycleError("created tab identity mismatch")
                 tab_id, pane_id = self._validate_created_tab(workspace_id, created_workspace)
             else:
-                existing = self._validate_existing_tab(current, workspace_id, tab_label)
+                existing = self._validate_existing_tab(
+                    current,
+                    workspace_id,
+                    tab_label,
+                    legacy_tab_label,
+                )
                 if existing is None:
                     created = self._herdr.tab_create(workspace_id, tab_label, cwd)
                     created_tab_id = created.tab_id
@@ -161,7 +187,13 @@ class TaskStarter:
             main = task.workstreams["main"]
             pane_ids = {**(main.pane_ids or {}), "root": pane_id}
             updated_main = main.model_copy(
-                update={"tab_id": tab_id, "tab_label": tab_label, "pane_ids": pane_ids}
+                update={
+                    "tab_id": tab_id,
+                    "tab_label": tab_label,
+                    "pane_ids": pane_ids,
+                    "worktree": str(registration.path),
+                    "branch": registration.branch,
+                }
             )
             updated = task.model_copy(
                 update={
