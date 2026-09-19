@@ -41,6 +41,7 @@ When creating additional working data:
 - Place all Git worktrees, cloned repositories, and agent-managed temporary data for that task inside its task root, using subdirectories such as `worktree/`, `repo/`, and `tmp/`.
 - Do not create these resources outside the task root unless the user explicitly requests another location or a tool requires a system-managed temporary location.
 - Keep the task root while its Pull Request is open or may still receive review updates.
+- For Issue implementation, create the feature worktree under the marked task root, then run `bin/herdr-task start ISSUE --cwd WORKTREE` before creating implementation or investigation artifacts. The cwd must be the root of a registered non-primary Git worktree with an attached branch; do not use the primary checkout or a detached worktree.
 
 ## Task workspace cleanup
 
