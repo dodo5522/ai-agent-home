@@ -164,6 +164,7 @@ uv run --project tools/google_drive_upload google-drive-upload upload --folder-i
 
 `auth` はブラウザーで同意するためのURLを表示します。`upload` は再開可能アップロードを使い、
 完了後にDriveからファイル名とサイズを読み戻して検証します。共有設定は変更しません。
+既存フォルダーへの移動にも対応するため、OAuthスコープは `drive` を使用します。
 
 headless環境では、サーバー上で `auth --port 8080` を実行し、手元の端末から
 `ssh -N -L 8080:127.0.0.1:8080 USER@SERVER` を張ってください。表示されたURLを手元の
