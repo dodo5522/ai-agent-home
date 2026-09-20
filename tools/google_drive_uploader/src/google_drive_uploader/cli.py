@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import mimetypes
 from pathlib import Path

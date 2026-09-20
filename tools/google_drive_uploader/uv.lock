@@ -296,7 +296,7 @@ wheels = [
 ]
 
 [[package]]
-name = "google-drive-upload"
+name = "google-drive-uploader"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

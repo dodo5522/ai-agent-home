@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from google_drive_upload.drive import DriveConfig, DriveConfigurationError, _write_private_json
+from google_drive_uploader.drive import DriveConfig, DriveConfigurationError, _write_private_json
 
 
 def test_config_requires_private_directory(tmp_path: Path) -> None:
