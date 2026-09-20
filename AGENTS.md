@@ -100,3 +100,10 @@ When adding a tool or automation with non-trivial logic:
 - Make Python tools directly runnable with `uvx` (or the equivalent `uv run` project command).
 - Use pytest for tests, shared setup through fixtures, and Ruff for formatting and linting.
 - Keep each tool's runtime and development dependencies in that tool's own `pyproject.toml` and `uv.lock` under `tools/<tool-name>/`.
+
+## Python design and typing
+
+- Keep modules focused on one responsibility. CLI modules should handle argument parsing, output, and exit codes; authentication, external API operations, and persistence belong in dedicated modules.
+- Prefer concrete library types at API boundaries. Use the library's credential and service types when available.
+- Use `TypedDict` for structured JSON responses and `Protocol` for replaceable dependencies.
+- Do not use `object` as a generic escape hatch. Use `Any` or `cast` only at unavoidable untyped external boundaries, and do not spread that ambiguity through the rest of the code.
