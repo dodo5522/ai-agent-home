@@ -1,34 +1,55 @@
 import mimetypes
 from pathlib import Path
+from typing import NotRequired, TypedDict, cast
 
-from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import Resource, build
 from googleapiclient.http import MediaFileUpload
 
 from .auth import DriveConfigurationError
 
 
-def build_drive_service(credentials: object) -> object:
+class DriveUser(TypedDict):
+    emailAddress: NotRequired[str]
+
+
+class DriveAbout(TypedDict):
+    user: NotRequired[DriveUser]
+
+
+class DriveFile(TypedDict):
+    id: str
+    name: str
+    size: str
+    webViewLink: NotRequired[str]
+    parents: NotRequired[list[str]]
+
+
+class UploadResponse(TypedDict):
+    id: str
+
+
+def build_drive_service(credentials: Credentials) -> Resource:
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
-def account_email(service: object) -> str:
-    about = (
+def account_email(service: Resource) -> str:
+    about = cast(
+        DriveAbout,
         service.about()
         .get(fields="user(displayName,emailAddress),storageQuota(limit,usage)")
-        .execute()
+        .execute(),
     )
     return about.get("user", {}).get("emailAddress", "unknown")
 
 
-def upload_files(
-    service: object, paths: list[Path], folder_id: str | None
-) -> list[dict[str, object]]:
-    uploaded: list[dict[str, object]] = []
+def upload_files(service: Resource, paths: list[Path], folder_id: str | None) -> list[DriveFile]:
+    uploaded: list[DriveFile] = []
     for path in paths:
         if not path.is_file():
             raise DriveConfigurationError(f"ファイルがありません: {path}")
         media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        metadata: dict[str, object] = {"name": path.name}
+        metadata: dict[str, str | list[str]] = {"name": path.name}
         if folder_id:
             metadata["parents"] = [folder_id]
         media = MediaFileUpload(str(path), mimetype=media_type, resumable=True)
@@ -40,9 +61,13 @@ def upload_files(
         response = None
         while response is None:
             _, response = request.next_chunk()
+        response = cast(UploadResponse, response)
         file_id = response["id"]
-        verified = (
-            service.files().get(fileId=file_id, fields="id,name,size,webViewLink,parents").execute()
+        verified = cast(
+            DriveFile,
+            service.files()
+            .get(fileId=file_id, fields="id,name,size,webViewLink,parents")
+            .execute(),
         )
         expected_size = path.stat().st_size
         if int(verified.get("size", -1)) != expected_size or verified.get("name") != path.name:
