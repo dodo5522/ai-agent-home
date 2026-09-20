@@ -22,7 +22,6 @@ Codex セッションを自動復旧するためのホームディレクトリ�
 - Tailscale
 - mise管理のBlender 5.2.2
 - `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python、uv
-- ロック済みの `mcp-for-blender` とBlenderアドオン
 - `bin/get-github-app-token.py` が使用する Python パッケージ `PyJWT[crypto]`
 
 既に存在する Tailscale と mise は再インストールしません。`apt-get`、
@@ -103,25 +102,13 @@ Herdr 管理下の workspace、pane、Agent を Codex から安全に操作す�
 [`docs/HERDR-SKILL.md`](docs/HERDR-SKILL.md) を参照してください。upstream Skill の
 配置、発火条件、Agent の状態別対応、更新方法を記載しています。
 
-### Blender MCP
+### Blender batch modeling
 
-`install.sh` はmiseでBlenderを導入した後、`tools/blender_mcp/uv.lock` に固定された
-`mcp-for-blender`を同期し、BlenderアドオンをユーザーのBlender設定へ導入します。
-BlenderのGUIを使う場合は、Blenderを起動して `Edit` → `Preferences` → `Add-ons` から
-`Interface: MCP for Blender` を有効にし、3D Viewの `N` サイドバーにあるMCPパネルで
-サーバーを開始してください。その後、Codexを再起動します。
-
-MCPサーバーは `127.0.0.1:9876` に限定しています。アドオンはBlender内でPythonを
-実行できるため、重要な `.blend` ファイルを先にバックアップし、未知のスクリプトを
-確認してから実行してください。Codex設定では `UV_PYTHON_PREFERENCE=only-managed` と
-`DISABLE_TELEMETRY=true` を指定しています。
-
-### Blender modeling Skill
-
-`.codex/skills/blender-modeling/SKILL.md` は、既存のBlender MCPを使った
-シーン確認・モデリング・検証・出力の手順を提供します。追加の実行コードはありません。
-`$blender-modeling` で明示的に利用できます。セットアップ、利用例、公開ツールの
-採用判断は [Blender Skill運用手順](docs/BLENDER-SKILL.md) を参照してください。
+Blender標準CLIでバックグラウンド実行します。MCPサーバーやGUIは不要です。
+`.codex/skills/blender-modeling/SKILL.md` を `$blender-modeling` で利用できます。
+作品の最終版Pythonスクリプト、`.blend`、確認画像、実行メモを一組として保存します。
+Google Driveへの転送は既存の `bin/google-drive-uploader` を利用します。
+[Blender Skill運用手順](docs/BLENDER-SKILL.md) に実行・保存・移行手順を記載しています。
 
 ### Herdr タスクライフサイクル
 
@@ -147,7 +134,6 @@ flock --version
 tailscale version
 blender --version
 blender --background --factory-startup --python-expr 'print("BLENDER_HEADLESS_OK")'
-uv run --locked --project tools/blender_mcp mcp-for-blender --help
 mise current
 mise exec python -- python -c 'import jwt; print(jwt.__version__)'
 ```

@@ -1,5 +1,15 @@
 # Blender Modeling Skill Implementation Plan
 
+## Superseding implementation scope
+
+The user requested removal of Blender MCP in favor of standard batch execution.
+The original tasks below are historical. Update the Skill, README and operating
+guide; remove MCP registration, dependency metadata and install phases. Update
+installer regression checks to keep Blender/runtime coverage and reject the
+retired MCP path. Validate CLI startup, Skill structure and shell/diff hygiene.
+Document final-only artwork retention and existing Drive upload semantics;
+do not create a new uploader or upload implementation artifacts as artwork.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a repository-managed Blender modeling Skill that guides agents through safe, repeatable use of the existing `mcp-for-blender` integration without adding custom runtime code.

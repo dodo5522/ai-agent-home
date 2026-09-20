@@ -1,5 +1,17 @@
 # Blender modeling Codex Skill design
 
+## Superseding decision: batch execution and final artifact retention
+
+The user subsequently chose standard headless Blender batch execution and
+removal of the MCP path. This decision supersedes the MCP architecture below,
+which is retained as design history. Remove the Blender MCP client registration,
+locked dependency metadata and installer phases; retain Blender and OS libraries.
+Use a small instruction-only Skill with per-artwork Python executed by Blender.
+Keep the final Python, blend, preview, execution note and required assets together;
+artwork version control is unnecessary. Explicitly requested Drive uploads use
+the existing uploader; it creates files rather than replacing prior versions.
+No artwork has been generated or uploaded as part of this implementation task.
+
 ## Context
 
 Issue #41 provides the repository-managed Blender 5.2.2 runtime, the locked
