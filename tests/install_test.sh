@@ -3,6 +3,10 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 INSTALLER="$REPO_ROOT/install.sh"
+MISE_CONFIG="$REPO_ROOT/.config/mise/config.toml"
+BLENDER_MCP_PROJECT="$REPO_ROOT/tools/blender_mcp/pyproject.toml"
+BLENDER_MCP_LOCK="$REPO_ROOT/tools/blender_mcp/uv.lock"
+CODEX_CONFIG="$REPO_ROOT/.codex/config.toml"
 HERDR_SKILL="$REPO_ROOT/.codex/skills/herdr/SKILL.md"
 HERDR_SKILL_PROVENANCE="$REPO_ROOT/.codex/skills/herdr/UPSTREAM.md"
 HERDR_SKILL_DOC="$REPO_ROOT/docs/HERDR-SKILL.md"
@@ -52,6 +56,78 @@ test_dry_run_lists_every_install_phase() {
     assert_contains "$output" "mise install" "dry-run includes configured tools"
     assert_contains "$output" "PyJWT[crypto]" "dry-run includes Python dependencies"
     assert_contains "$output" "+ gh --version" "dry-run verifies GitHub CLI"
+}
+
+test_dry_run_lists_blender_runtime_and_mcp_phases() {
+    local output
+
+    output=$(bash "$INSTALLER" --dry-run 2>&1) || {
+        fail "dry-run includes Blender phases"
+        return
+    }
+
+    assert_contains "$output" "libgl1 libsm6" \
+        "dry-run includes Blender OpenGL and session libraries"
+    assert_contains "$output" "libx11-6 libxext6 libxfixes3 libxi6" \
+        "dry-run includes Blender X11 libraries"
+    assert_contains "$output" "uv sync --locked --project" \
+        "dry-run includes locked Blender MCP sync"
+    assert_contains "$output" "mcp-for-blender install-addon" \
+        "dry-run includes Blender MCP add-on installation"
+    assert_contains "$output" "blender --version" \
+        "dry-run verifies Blender"
+    assert_contains "$output" "blender --background --factory-startup" \
+        "dry-run verifies headless Blender startup"
+    assert_contains "$output" "mcp-for-blender --help" \
+        "dry-run verifies Blender MCP"
+}
+
+test_blender_mise_and_mcp_metadata_are_present() {
+    local mise_config project
+
+    mise_config=$(<"$MISE_CONFIG")
+    assert_contains "$mise_config" 'blender = "5.2.2"' \
+        "mise pins the Blender version"
+
+    if [[ ! -f $BLENDER_MCP_PROJECT ]]; then
+        fail "Blender MCP uv project exists"
+        return
+    fi
+    pass "Blender MCP uv project exists"
+    project=$(<"$BLENDER_MCP_PROJECT")
+    assert_contains "$project" 'requires-python = ">=3.11,<3.12"' \
+        "Blender MCP project pins Python 3.11"
+    assert_contains "$project" 'mcp-for-blender==2.0.0' \
+        "Blender MCP dependency is exact"
+
+    if [[ -f $BLENDER_MCP_LOCK ]]; then
+        pass "Blender MCP uv lockfile exists"
+    else
+        fail "Blender MCP uv lockfile exists"
+    fi
+}
+
+test_codex_blender_mcp_configuration_is_localhost_only() {
+    local config
+
+    if [[ ! -f $CODEX_CONFIG ]]; then
+        fail "Codex config exists"
+        return
+    fi
+    pass "Codex config exists"
+    config=$(<"$CODEX_CONFIG")
+    assert_contains "$config" '[mcp_servers.blender]' \
+        "Codex registers the Blender MCP server"
+    assert_contains "$config" 'tools/blender_mcp' \
+        "Codex uses the locked Blender MCP project"
+    assert_contains "$config" 'BLENDER_HOST = "127.0.0.1"' \
+        "Blender MCP binds to localhost"
+    assert_contains "$config" 'BLENDER_PORT = "9876"' \
+        "Blender MCP uses the documented port"
+    assert_contains "$config" 'UV_PYTHON_PREFERENCE = "only-managed"' \
+        "Blender MCP uses uv-managed Python"
+    assert_contains "$config" 'DISABLE_TELEMETRY = "true"' \
+        "Blender MCP telemetry is disabled"
 }
 
 test_help_documents_non_mutating_mode() {
@@ -311,6 +387,9 @@ test_herdr_task_lifecycle_contract_is_installed_and_documented() {
 }
 
 test_dry_run_lists_every_install_phase
+test_dry_run_lists_blender_runtime_and_mcp_phases
+test_blender_mise_and_mcp_metadata_are_present
+test_codex_blender_mcp_configuration_is_localhost_only
 test_help_documents_non_mutating_mode
 test_unknown_option_fails
 test_runtime_paths_use_mise_shims

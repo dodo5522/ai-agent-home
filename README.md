@@ -17,10 +17,12 @@ Codex セッションを自動復旧するためのホームディレクトリ�
 [`install.sh`](install.sh) は次の依存関係をまとめてインストールします。
 
 - Ubuntu パッケージ: `build-essential`、`ca-certificates`、`curl`、`git`、
-  `jq`、`gh`、`util-linux`（`flock` を含む）
+  `jq`、`gh`、`util-linux`（`flock` を含む）、BlenderのOpenGL/X11ランタイム
+  (`libgl1`、`libsm6`、`libx11-6` など)
 - Tailscale
-- mise
+- mise管理のBlender 5.2.2
 - `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python、uv
+- ロック済みの `mcp-for-blender` とBlenderアドオン
 - `bin/get-github-app-token.py` が使用する Python パッケージ `PyJWT[crypto]`
 
 既に存在する Tailscale と mise は再インストールしません。`apt-get`、
@@ -101,6 +103,19 @@ Herdr 管理下の workspace、pane、Agent を Codex から安全に操作す�
 [`docs/HERDR-SKILL.md`](docs/HERDR-SKILL.md) を参照してください。upstream Skill の
 配置、発火条件、Agent の状態別対応、更新方法を記載しています。
 
+### Blender MCP
+
+`install.sh` はmiseでBlenderを導入した後、`tools/blender_mcp/uv.lock` に固定された
+`mcp-for-blender`を同期し、BlenderアドオンをユーザーのBlender設定へ導入します。
+BlenderのGUIを使う場合は、Blenderを起動して `Edit` → `Preferences` → `Add-ons` から
+`Interface: MCP for Blender` を有効にし、3D Viewの `N` サイドバーにあるMCPパネルで
+サーバーを開始してください。その後、Codexを再起動します。
+
+MCPサーバーは `127.0.0.1:9876` に限定しています。アドオンはBlender内でPythonを
+実行できるため、重要な `.blend` ファイルを先にバックアップし、未知のスクリプトを
+確認してから実行してください。Codex設定では `UV_PYTHON_PREFERENCE=only-managed` と
+`DISABLE_TELEMETRY=true` を指定しています。
+
 ### Herdr タスクライフサイクル
 
 Issue 対応の開始、PR / review 中の保持、安全な cleanup と再試行の運用規則は
@@ -123,6 +138,9 @@ jq --version
 gh --version
 flock --version
 tailscale version
+blender --version
+blender --background --factory-startup --python-expr 'print("BLENDER_HEADLESS_OK")'
+uv run --locked --project tools/blender_mcp mcp-for-blender --help
 mise current
 mise exec python -- python -c 'import jwt; print(jwt.__version__)'
 ```
