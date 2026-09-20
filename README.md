@@ -148,6 +148,27 @@ systemctl --user status herdr.service herdr-agents.service
 
 ## テスト
 
+### Google Driveへの成果物アップロード
+
+Google CloudでDrive APIを有効化し、デスクトップアプリ用OAuthクライアントのJSONを
+`~/.config/google-drive/credentials.json` に置いてください。ディレクトリは700、JSONは600にし、
+このファイルをGitへ追加しないでください。
+
+```bash
+mkdir -p -m 700 ~/.config/google-drive
+chmod 600 ~/.config/google-drive/credentials.json
+uv run --project tools/google_drive_upload google-drive-upload auth
+uv run --project tools/google_drive_upload google-drive-upload status
+uv run --project tools/google_drive_upload google-drive-upload upload --folder-id FOLDER_ID FILE...
+```
+
+`auth` はブラウザーで同意するためのURLを表示します。`upload` は再開可能アップロードを使い、
+完了後にDriveからファイル名とサイズを読み戻して検証します。共有設定は変更しません。
+
+headless環境では、サーバー上で `auth --port 8080` を実行し、手元の端末から
+`ssh -N -L 8080:127.0.0.1:8080 USER@SERVER` を張ってください。表示されたURLを手元の
+ブラウザーで開くと、認証後のlocalhostリダイレクトがSSHトンネル経由でサーバーへ戻ります。
+
 インストーラの非破壊モードと、インストール成果物のスモークテストは次のコマンドで検証できます。
 
 ```bash
