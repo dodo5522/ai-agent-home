@@ -100,3 +100,17 @@ When adding a tool or automation with non-trivial logic:
 - Make Python tools directly runnable with `uvx` (or the equivalent `uv run` project command).
 - Use pytest for tests, shared setup through fixtures, and Ruff for formatting and linting.
 - Keep each tool's runtime and development dependencies in that tool's own `pyproject.toml` and `uv.lock` under `tools/<tool-name>/`.
+
+## Python design and typing
+
+- Keep modules focused on one responsibility. CLI modules should handle argument parsing, output, and exit codes; authentication, external API operations, and persistence belong in dedicated modules.
+- Prefer concrete library types at API boundaries. Use the library's credential and service types when available.
+- Use `TypedDict` for structured JSON responses and `Protocol` for replaceable dependencies.
+- Do not use `object` as a generic escape hatch. Use `Any` or `cast` only at unavoidable untyped external boundaries, and do not spread that ambiguity through the rest of the code.
+
+## Google Drive uploads
+
+- Use `bin/google-drive-uploader` as the only repository entrypoint for Google Drive operations.
+- Run its `upload` subcommand only when the user has clearly and explicitly requested uploading artifacts to Google Drive in the current task. Authentication and status checks are read-only and may be run when needed for that request.
+- Do not infer upload permission from a request to create, inspect, validate, or discuss an artifact. Do not upload automatically after generating a file.
+- Never upload credentials or other secret material, even when explicitly requested. The uploader must reject credential/token/secret/private-key filenames and `.pem`, `.key`, `.p12`, and `.pfx` files before making a Drive API upload request.
