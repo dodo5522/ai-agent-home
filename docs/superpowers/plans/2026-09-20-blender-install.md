@@ -11,6 +11,11 @@ boundary of the Blender socket add-on.
 
 - `.config/mise/config.toml` owns the Blender version (`5.2.2`) alongside the
   existing Codex, Herdr, Node, Python, and uv tools.
+- Ubuntu runtime libraries required by the prebuilt Blender binary are
+  installed explicitly: `libgl1`, `libsm6`, `libx11-6`, `libxext6`,
+  `libxfixes3`, `libxi6`, `libxrender1`, `libxrandr2`, `libxinerama1`, and
+  `libxxf86vm1`. These are runtime packages, not Blender source-build
+  `-dev` dependencies.
 - `tools/blender_mcp/pyproject.toml` owns the third-party Python dependency and
   requires Python 3.11 because the upstream MCP documentation recommends a
   uv-managed 3.11 interpreter for compatibility.
@@ -22,7 +27,7 @@ boundary of the Blender socket add-on.
   project, binds it to `127.0.0.1:9876`, and disables telemetry explicitly.
 - `tests/install_test.sh` verifies the installer contract without installing
   software. The real installer verification checks Blender, uv, the locked
-  project, and the MCP CLI after installation.
+  project, the MCP CLI, and a headless Blender launch after installation.
 
 ## Task 1: Add failing installer contract tests
 
@@ -37,6 +42,8 @@ Add tests that fail on the base branch because they require:
   dependency and Python 3.11 compatibility.
 - `tools/blender_mcp/uv.lock`.
 - Dry-run output containing the locked uv sync and add-on installation phases.
+- The apt package command containing the Blender OpenGL, X11, and session
+  runtime libraries.
 - Verification output containing Blender and the MCP CLI checks.
 - `.codex/config.toml` containing a localhost-only Blender MCP server using the
   locked project and `UV_PYTHON_PREFERENCE=only-managed`.
@@ -55,7 +62,9 @@ Files:
 Create a non-package uv project named `ai-agent-home-blender-mcp`, requiring
 Python `>=3.11,<3.12` and exactly `mcp-for-blender==2.0.0`. Generate and commit
 the lockfile with the mise-managed uv executable. Add Blender `5.2.2` to the
-mise tools table.
+mise tools table. Add the runtime apt packages listed in the design to the
+existing Ubuntu package installation command. Do not add compiler or `-dev`
+packages solely for the prebuilt mise binary.
 
 Run the focused metadata assertions and `mise exec uv -- uv lock --check
 --project tools/blender_mcp`.
@@ -73,8 +82,8 @@ locked Blender MCP project. After the existing `mise install` phase:
 1. Run `uv sync --locked --project tools/blender_mcp`.
 2. Run `uv run --project tools/blender_mcp mcp-for-blender install-addon` with
    `UV_PYTHON_PREFERENCE=only-managed`.
-3. Verify `blender --version`, `uv --version`, the locked project, and
-   `mcp-for-blender --help`.
+3. Verify `blender --version`, a headless factory-startup invocation,
+   `uv --version`, the locked project, and `mcp-for-blender --help`.
 
 The dry-run path must print these exact phases without invoking uv, Blender, or
 the add-on installer. The normal path must remain a login-user operation; no
