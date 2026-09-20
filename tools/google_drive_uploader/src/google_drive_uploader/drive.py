@@ -8,6 +8,12 @@ from googleapiclient.http import MediaFileUpload
 
 from .auth import DriveConfigurationError
 
+BLOCKED_UPLOAD_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
+BLOCKED_UPLOAD_NAMES = frozenset(
+    {"credentials.json", "token.json", "client_secret.json", "service-account.json"}
+)
+BLOCKED_UPLOAD_NAME_PARTS = ("credential", "secret", "token", "private-key", "private_key")
+
 
 class DriveUser(TypedDict):
     emailAddress: NotRequired[str]
@@ -43,7 +49,19 @@ def account_email(service: Resource) -> str:
     return about.get("user", {}).get("emailAddress", "unknown")
 
 
+def validate_upload_paths(paths: list[Path]) -> None:
+    for path in paths:
+        normalized_name = path.name.casefold()
+        if (
+            normalized_name in BLOCKED_UPLOAD_NAMES
+            or normalized_name.endswith(BLOCKED_UPLOAD_SUFFIXES)
+            or any(part in normalized_name for part in BLOCKED_UPLOAD_NAME_PARTS)
+        ):
+            raise DriveConfigurationError(f"アップロード禁止のファイル種別です: {path.name}")
+
+
 def upload_files(service: Resource, paths: list[Path], folder_id: str | None) -> list[DriveFile]:
+    validate_upload_paths(paths)
     uploaded: list[DriveFile] = []
     for path in paths:
         if not path.is_file():

@@ -113,3 +113,4 @@ When adding a tool or automation with non-trivial logic:
 - Use `bin/google-drive-uploader` as the only repository entrypoint for Google Drive operations.
 - Run its `upload` subcommand only when the user has clearly and explicitly requested uploading artifacts to Google Drive in the current task. Authentication and status checks are read-only and may be run when needed for that request.
 - Do not infer upload permission from a request to create, inspect, validate, or discuss an artifact. Do not upload automatically after generating a file.
+- Never upload credentials or other secret material, even when explicitly requested. The uploader must reject credential/token/secret/private-key filenames and `.pem`, `.key`, `.p12`, and `.pfx` files before making a Drive API upload request.
