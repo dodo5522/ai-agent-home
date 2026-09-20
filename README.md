@@ -116,6 +116,13 @@ MCPサーバーは `127.0.0.1:9876` に限定しています。アドオンはBl
 確認してから実行してください。Codex設定では `UV_PYTHON_PREFERENCE=only-managed` と
 `DISABLE_TELEMETRY=true` を指定しています。
 
+### Blender modeling Skill
+
+`.codex/skills/blender-modeling/SKILL.md` は、既存のBlender MCPを使った
+シーン確認・モデリング・検証・出力の手順を提供します。追加の実行コードはありません。
+`$blender-modeling` で明示的に利用できます。セットアップ、利用例、公開ツールの
+採用判断は [Blender Skill運用手順](docs/BLENDER-SKILL.md) を参照してください。
+
 ### Herdr タスクライフサイクル
 
 Issue 対応の開始、PR / review 中の保持、安全な cleanup と再試行の運用規則は

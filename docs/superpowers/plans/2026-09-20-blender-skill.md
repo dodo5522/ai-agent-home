@@ -12,6 +12,23 @@
 
 ## Global Constraints
 
+### Execution adjustment (2026-09-20)
+
+Native execution uses the existing skill-creator structural validator and a
+scenario-based author review instead of Tasks 1–3's prose substring assertions.
+Those assertions mirror wording rather than observable behavior, and the
+planned sample Skill does not even contain several asserted phrases. No new
+test code or runtime helpers are needed for this instruction-only change.
+The existing installer suite remains the regression check. The full unrelated
+Python suites in Task 4 are replaced with that focused check and diff hygiene.
+This adjustment preserves the specified deliverables and records the departure
+from the original test plan; no RED/GREEN behavioral test is claimed.
+
+The validation dependency PyYAML 6.0.3 is used only in an ephemeral uv
+environment for the existing checker, not added to project runtime dependencies.
+Live MCP modeling remains an operational acceptance step; the author scenario
+review is not an end-to-end modeling test.
+
 - Reuse the repository's existing `mcp-for-blender` integration from #41.
 - Do not add a custom Blender daemon, Python package, or MCP server.
 - Do not vendor third-party Skills or plugins in this issue.
@@ -232,4 +249,3 @@ Expected: every command exits zero; no Blender process or user scene is mutated 
 - [ ] **Step 2: Commit only if verification requires a test/documentation correction**
 
 If a correction is required, add a focused failing assertion first, run it to observe the failure, make the minimal correction, rerun the full suite, and use a conventional commit with the `Generated-by: Codex` trailer. If no correction is required, do not create an empty commit.
-
