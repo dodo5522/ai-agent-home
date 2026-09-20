@@ -157,9 +157,9 @@ Google CloudでDrive APIを有効化し、デスクトップアプリ用OAuthク
 ```bash
 mkdir -p -m 700 ~/.config/google-drive
 chmod 600 ~/.config/google-drive/credentials.json
-uv run --project tools/google_drive_uploader google-drive-uploader auth
-uv run --project tools/google_drive_uploader google-drive-uploader status
-uv run --project tools/google_drive_uploader google-drive-uploader upload --folder-id FOLDER_ID FILE...
+bin/google-drive-uploader auth
+bin/google-drive-uploader status
+bin/google-drive-uploader upload --folder-id FOLDER_ID FILE...
 ```
 
 `auth` はブラウザーで同意するためのURLを表示します。`upload` は再開可能アップロードを使い、
