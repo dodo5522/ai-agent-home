@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 MISE_CONFIG_FILE="$REPO_ROOT/.config/mise/config.toml"
-BLENDER_MCP_PROJECT_DIR="$REPO_ROOT/tools/blender_mcp"
 DRY_RUN=false
 
 usage() {
@@ -57,24 +56,6 @@ run_mise_exec() {
     else
         MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG_FILE" "$mise_bin" exec "$tool" -- "$@"
     fi
-}
-
-run_mise_uv() {
-    if [[ $DRY_RUN == true ]]; then
-        printf '+ MISE_GLOBAL_CONFIG_FILE=%q UV_PYTHON_PREFERENCE=only-managed %q exec uv -- uv ' \
-            "$MISE_CONFIG_FILE" "${mise_bin:-$HOME/.local/bin/mise}"
-        printf '%q ' "$@"
-        printf '\n'
-    else
-        MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG_FILE" \
-            UV_PYTHON_PREFERENCE=only-managed \
-            "$mise_bin" exec uv -- uv "$@"
-    fi
-}
-
-run_mcp_for_blender() {
-    run_mise_uv run --locked --project "$BLENDER_MCP_PROJECT_DIR" \
-        mcp-for-blender "$@"
 }
 
 download_and_run() {
@@ -189,10 +170,6 @@ else
     MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG_FILE" "$mise_bin" install
 fi
 
-log "installing Blender MCP dependencies"
-run_mise_uv sync --locked --project "$BLENDER_MCP_PROJECT_DIR"
-run_mcp_for_blender install-addon
-
 log "installing Python packages"
 if [[ $DRY_RUN == true ]]; then
     printf "+ MISE_GLOBAL_CONFIG_FILE=%q %q exec python -- python -m pip install --upgrade '%s'\n" \
@@ -210,8 +187,7 @@ run tailscale version
 run_mise_exec blender blender --version
 run_mise_exec blender blender --background --factory-startup \
     --python-expr 'print("BLENDER_HEADLESS_OK")'
-run_mise_uv --version
-run_mcp_for_blender --help
+run_mise_exec uv uv --version
 if [[ $DRY_RUN == true ]]; then
     printf '+ MISE_GLOBAL_CONFIG_FILE=%q %q current\n' "$MISE_CONFIG_FILE" "$mise_bin"
     printf '+ MISE_GLOBAL_CONFIG_FILE=%q %q exec python -- python -c %q\n' \
