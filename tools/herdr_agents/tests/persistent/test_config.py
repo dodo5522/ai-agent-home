@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from herdr_task_lifecycle.agents.config import AgentDefinition, load_agent_definitions
-from herdr_task_lifecycle.errors import LifecycleError
+from herdr_agents import AgentManagementError
+from herdr_agents.persistent.config import AgentDefinition, load_agent_definitions
 
 
 def write_config(tmp_path: Path, content: str) -> Path:
@@ -54,7 +54,7 @@ def test_rejects_unknown_fields_before_reconciliation(tmp_path: Path) -> None:
         """,
     )
 
-    with pytest.raises(LifecycleError, match="unknown field.*model"):
+    with pytest.raises(AgentManagementError, match="unknown field.*model"):
         load_agent_definitions(path)
 
 
@@ -70,7 +70,7 @@ def test_rejects_invalid_agent_names(tmp_path: Path, name: str) -> None:
         """,
     )
 
-    with pytest.raises(LifecycleError, match="invalid Agent name"):
+    with pytest.raises(AgentManagementError, match="invalid Agent name"):
         load_agent_definitions(path)
 
 
@@ -94,7 +94,7 @@ def test_rejects_empty_required_values(tmp_path: Path, field: str) -> None:
         ),
     )
 
-    with pytest.raises(LifecycleError, match=f"{field}.*non-empty"):
+    with pytest.raises(AgentManagementError, match=f"{field}.*non-empty"):
         load_agent_definitions(path)
 
 
@@ -109,7 +109,7 @@ def test_rejects_relative_cwd(tmp_path: Path) -> None:
         """,
     )
 
-    with pytest.raises(LifecycleError, match="cwd.*absolute"):
+    with pytest.raises(AgentManagementError, match="cwd.*absolute"):
         load_agent_definitions(path)
 
 
@@ -129,5 +129,5 @@ def test_rejects_duplicate_agent_tables(tmp_path: Path) -> None:
         """,
     )
 
-    with pytest.raises(LifecycleError, match="invalid TOML"):
+    with pytest.raises(AgentManagementError, match="invalid TOML"):
         load_agent_definitions(path)

@@ -21,6 +21,23 @@ wheels = [
 ]
 
 [[package]]
+name = "herdr-agents"
+version = "0.1.0"
+source = { directory = "../herdr_agents" }
+dependencies = [
+    { name = "herdr-runtime" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "herdr-runtime", directory = "../herdr_runtime" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = "==8.4.2" },
+    { name = "ruff", specifier = "==0.14.10" },
+]
+
+[[package]]
 name = "herdr-runtime"
 version = "0.1.0"
 source = { directory = "../herdr_runtime" }
@@ -38,6 +55,7 @@ name = "herdr-task"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "herdr-agents" },
     { name = "herdr-runtime" },
     { name = "herdr-task-state" },
 ]
@@ -50,6 +68,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "herdr-agents", directory = "../herdr_agents" },
     { name = "herdr-runtime", directory = "../herdr_runtime" },
     { name = "herdr-task-state", directory = "../herdr_task_state" },
 ]

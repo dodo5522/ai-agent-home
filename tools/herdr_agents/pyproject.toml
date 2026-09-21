@@ -3,18 +3,14 @@ requires = ["setuptools>=75.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "herdr-task"
+name = "herdr-agents"
 version = "0.1.0"
-description = "Manage the Herdr task lifecycle"
+description = "Manage exact-name Herdr Agents"
 requires-python = ">=3.14"
-dependencies = [
-    "herdr-agents",
-    "herdr-runtime",
-    "herdr-task-state",
-]
+dependencies = ["herdr-runtime"]
 
 [project.scripts]
-herdr-task = "herdr_task_lifecycle.cli:main"
+herdr-agents = "herdr_agents.persistent.cli:main"
 
 [dependency-groups]
 dev = [
@@ -23,9 +19,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-herdr-agents = { path = "../herdr_agents" }
 herdr-runtime = { path = "../herdr_runtime" }
-herdr-task-state = { path = "../herdr_task_state" }
 
 [tool.setuptools]
 package-dir = {"" = "src"}
