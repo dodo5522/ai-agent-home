@@ -26,7 +26,7 @@ from ...errors import LifecycleError
 from ...herdr_operations import HerdrOperations
 from ...identity import load_issue_title, resolve_repository, short_title
 from ...worktree import TASK_ROOTS_DIRECTORY, resolve_managed_worktree
-from .agent import TaskAgentStarter
+from .implementer import TaskAgentStarter
 
 
 @dataclass(frozen=True)

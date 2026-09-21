@@ -4,6 +4,7 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
+from herdr_agents import AgentManagementError
 from herdr_runtime import HerdrRuntimeError
 
 from .commands.cleanup.command import add_parser as add_cleanup_parser
@@ -30,6 +31,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         return handler(args)
     except SystemExit as exc:
         return int(exc.code)
-    except (LifecycleError, HerdrRuntimeError) as exc:
+    except (AgentManagementError, LifecycleError, HerdrRuntimeError) as exc:
         print(f"herdr-task: {exc}", file=sys.stderr)
         return ExitCode.RUNTIME_ERROR

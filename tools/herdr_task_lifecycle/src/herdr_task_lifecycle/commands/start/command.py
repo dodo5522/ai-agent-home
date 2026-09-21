@@ -3,11 +3,12 @@
 import argparse
 from pathlib import Path
 
+from herdr_agents import AgentManager
 from herdr_runtime import HerdrClient, SubprocessRunner
 
 from ...errors import ExitCode
 from ...state import state_path
-from .agent import TaskAgentStarter
+from .implementer import TaskAgentStarter
 from .service import TaskStarter
 
 
@@ -29,7 +30,7 @@ def _run(args: argparse.Namespace) -> int:
         state_path(),
         runner=runner,
         herdr=herdr,
-        agent_starter=TaskAgentStarter(herdr),
+        agent_starter=TaskAgentStarter(AgentManager(herdr)),
     ).start(args.issue_number, cwd)
     print(resolution.task.to_json())
     return ExitCode.SUCCESS

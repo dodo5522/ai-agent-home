@@ -24,7 +24,7 @@ from herdr_task_state.model import (
 from herdr_task_state.store import StateStore
 
 from herdr_task_lifecycle.cli import main as lifecycle_main
-from herdr_task_lifecycle.commands.start.agent import TaskAgentStarter
+from herdr_task_lifecycle.commands.start.implementer import TaskAgentStarter
 from herdr_task_lifecycle.commands.start.service import TaskStarter, TaskStartResolution
 from herdr_task_lifecycle.errors import LifecycleError
 from herdr_task_lifecycle.herdr_operations import HerdrOperations
