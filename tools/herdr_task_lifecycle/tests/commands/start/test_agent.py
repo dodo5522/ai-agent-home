@@ -53,6 +53,15 @@ def test_task_agent_starts_and_prompts_once() -> None:
     key = TaskKey(current.repository, current.issue_number)
 
     first = starter.ensure_implementer(key, current, "w16:p2")
+    current = current.model_copy(
+        update={
+            "workstreams": {
+                "main": current.workstreams["main"].model_copy(
+                    update={"agents": {"implementer": first}}
+                )
+            }
+        }
+    )
     second = starter.ensure_implementer(key, current, "w16:p2")
 
     assert first == second == AgentReference(name=task_agent_name(key))
@@ -60,6 +69,22 @@ def test_task_agent_starts_and_prompts_once() -> None:
     assert len(herdr.prompts) == 1
     assert "Issue #9" in herdr.prompts[0][1]
     assert "Agent management" in herdr.prompts[0][1]
+
+
+def test_existing_unrecorded_agent_is_prompted_for_retry() -> None:
+    current = task()
+    key = TaskKey(current.repository, current.issue_number)
+    herdr = FakeHerdr(
+        live=[
+            AgentInfo(
+                task_agent_name(key), "codex", "w16:p2", "w16", Path("/work/issue-9")
+            )
+        ]
+    )
+
+    TaskAgentStarter(herdr).ensure_implementer(key, current, "w16:p2")
+
+    assert len(herdr.prompts) == 1
 
 
 def test_existing_agent_on_another_pane_is_not_adopted() -> None:

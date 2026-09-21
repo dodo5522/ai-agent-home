@@ -54,6 +54,8 @@ class TaskAgentStarter:
                 raise LifecycleError(f"Agent {name} is in a different workspace")
             if main.worktree is not None and existing.cwd != Path(main.worktree):
                 raise LifecycleError(f"Agent {name} has a different cwd")
+            if stored is None:
+                self._herdr.agent_prompt(name, self._initial_prompt(task_key, task))
             return AgentReference(name=name)
 
         started = self._herdr.agent_start(name, pane_id)
