@@ -31,8 +31,11 @@ model automatically from task complexity.
 
 ## Configuration
 
-The managed Agent configuration is stored at `.config/herdr/agents.toml` and is
-read with Python's standard-library `tomllib`. The file is human-maintained and
+The managed Agent configuration is stored at the user-local
+`.config/herdr/agents.toml` and is read with Python's standard-library
+`tomllib`. The repository tracks `.config/herdr/agents.toml.example` only,
+because configured absolute working directories are machine-specific. The file
+is human-maintained and
 read-only for the reconciler. Each definition has a unique Agent name, role,
 workspace label, and absolute cwd:
 

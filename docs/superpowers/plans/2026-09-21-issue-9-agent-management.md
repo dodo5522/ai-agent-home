@@ -87,7 +87,8 @@
 ### Task 4: Replace the global bootstrap behavior with configured reconciliation
 
 **Files:**
-- Create: `.config/herdr/agents.toml`
+- Create: `.config/herdr/agents.toml.example`; the user-local
+  `.config/herdr/agents.toml` is ignored because `cwd` is machine-specific.
 - Create: `tools/herdr_task_lifecycle/src/herdr_task_lifecycle/agents/cli.py`
 - Modify: `tools/herdr_task_lifecycle/pyproject.toml`
 - Modify: `bin/start-herdr-agents.sh`
@@ -101,7 +102,7 @@
 
 - [ ] **Step 1: Write failing CLI and shell-contract tests** for two configured starts, idempotent rerun, missing config, per-Agent failure exit status, and absence of the old global `select(.agent == "codex")` guard.
 - [ ] **Step 2: Run the tests** and confirm they fail because the entry point and new delegation are absent.
-- [ ] **Step 3: Implement the CLI and thin wrapper**. Keep the existing server wait and `flock`; let Python validate/reconcile definitions and print concise per-Agent results without tokens or raw Herdr output. Set the default config to the repository’s `.config/herdr/agents.toml` and make an empty default file safe.
+- [ ] **Step 3: Implement the CLI and thin wrapper**. Keep the existing server wait and `flock`; let Python validate/reconcile definitions and print concise per-Agent results without tokens or raw Herdr output. Set the default config to the user-local `.config/herdr/agents.toml` and make a missing default file safe; track only `.config/herdr/agents.toml.example`.
 - [ ] **Step 4: Re-run the focused tests, `tests/install_test.sh`, and the full Python suites for both lifecycle and state packages.
 - [ ] **Step 5: Commit** with `feat: reconcile configured Herdr Agents` and the required trailer.
 

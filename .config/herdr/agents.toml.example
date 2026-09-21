@@ -1,0 +1,12 @@
+# Copy this file to agents.toml and customize it for the local machine.
+# The actual agents.toml is intentionally not tracked because cwd is local.
+
+# [agents.codex-main]
+# role = "implementer"
+# workspace = "dodo5522/ai-agent-home"
+# cwd = "/home/takashi"
+
+# [agents.codex-reviewer]
+# role = "reviewer"
+# workspace = "dodo5522/ai-agent-home"
+# cwd = "/home/takashi/reviewer"

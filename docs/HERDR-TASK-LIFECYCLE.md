@@ -108,7 +108,15 @@ does not close state-owned resources as a rollback side effect.
 
 ## Managing multiple Agents
 
-Long-lived managed Agents are declared in `.config/herdr/agents.toml`:
+Long-lived managed Agents are declared in `.config/herdr/agents.toml`. Start by
+copying `.config/herdr/agents.toml.example`; the actual file is intentionally
+ignored by Git because each machine has its own absolute `cwd`:
+
+```bash
+cp .config/herdr/agents.toml.example .config/herdr/agents.toml
+```
+
+Example definition:
 
 ```toml
 [agents.codex-main]

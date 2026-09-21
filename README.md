@@ -125,8 +125,14 @@ cleanup規則は上記のライフサイクル文書を参照してください�
 bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 ```
 
-長期 Agent の定義は `.config/herdr/agents.toml` に置き、名前単位で冪等に
-reconcile します。
+長期 Agent の定義は、まず `.config/herdr/agents.toml.example` を
+`.config/herdr/agents.toml` にコピーしてから、ローカル環境に合わせて設定します。
+実設定は `cwd` が環境依存のためGit管理外です。Agentは名前単位で冪等に
+reconcile されます。
+
+```bash
+cp .config/herdr/agents.toml.example .config/herdr/agents.toml
+```
 
 ```bash
 herdr-agents reconcile --config .config/herdr/agents.toml

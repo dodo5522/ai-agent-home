@@ -16,6 +16,10 @@ rg -q 'worktree.*branch' docs/HERDR-TASK-LIFECYCLE.md
 rg -q '#<issue-number> <short-title>' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'herdr-agents reconcile' docs/HERDR-TASK-LIFECYCLE.md README.md
 rg -q '\.config/herdr/agents\.toml' docs/HERDR-TASK-LIFECYCLE.md README.md
+test -f .config/herdr/agents.toml.example
+rg -q 'agents\.toml\.example' README.md docs/HERDR-TASK-LIFECYCLE.md
+rg -q '^\.config/herdr/agents\.toml$' .gitignore
+test ! -e .config/herdr/agents.toml
 rg -q 'exact.*Agent name|Agent name.*exact' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'independently|per-Agent|Agent.*個別' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'Issue implementer|implementer Agent' docs/HERDR-TASK-LIFECYCLE.md

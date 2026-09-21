@@ -1,2 +1,0 @@
-# Managed Agent definitions are optional. Add one [agents.<name>] table per
-# long-lived Agent. Issue task Agents are created from task state.
