@@ -67,8 +67,10 @@ The Agent reconciler runs once for each configured definition:
 3. If that Agent is live, leave it unchanged regardless of other Agent states.
 4. If it is absent, resolve the configured or task-provided Pane by validated
    workspace/cwd identity and start exactly that Agent with `herdr agent start`.
-5. Use `--no-focus` for background starts and never depend on global focus,
-   terminal ID, list order, or bare Agent kind.
+5. Use an explicit Pane ID and never depend on global focus, terminal ID, list
+   order, or bare Agent kind. The installed `herdr agent start` command does
+   not expose a `--no-focus` option; explicit Pane targeting is the supported
+   non-ambiguous boundary for Agent startup.
 
 The operation is idempotent: repeating it with the same live Agent set makes
 no additional start calls. If one Agent is absent while others are live, only
