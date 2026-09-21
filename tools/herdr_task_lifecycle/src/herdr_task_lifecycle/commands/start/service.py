@@ -19,6 +19,7 @@ from ...herdr import CreatedResources, HerdrClient, WorkspaceInfo, _HerdrOperati
 from ...identity import load_issue_title, resolve_repository, short_title
 from ...runner import CommandRunner, SubprocessRunner
 from ...worktree import TASK_ROOTS_DIRECTORY, resolve_managed_worktree
+from .agent import TaskAgentStarter
 
 
 @dataclass(frozen=True)
@@ -42,11 +43,13 @@ class TaskStarter:
         runner: CommandRunner | None = None,
         herdr: _HerdrOperations | None = None,
         task_roots_directory: Path = TASK_ROOTS_DIRECTORY,
+        agent_starter: TaskAgentStarter | None = None,
     ) -> None:
         self._runner = runner or SubprocessRunner()
         self._herdr = herdr or HerdrClient(self._runner)
         self._store = StateStore(state_path)
         self._task_roots_directory = task_roots_directory
+        self._agent_starter = agent_starter
 
     def _read_state(self) -> TaskState:
         if not self._store.path.exists() and not self._store.path.is_symlink():
@@ -222,6 +225,33 @@ class TaskStarter:
                 stored = self._store.put(str(task_key), updated)
             except (StateFilesystemError, StateValidationError) as error:
                 raise LifecycleError("cannot write task state") from error
+            created_workspace_id = None
+            created_tab_id = None
+            if self._agent_starter is not None:
+                try:
+                    agent = self._agent_starter.ensure_implementer(task_key, stored, pane_id)
+                    main = stored.workstreams["main"]
+                    updated_main = main.model_copy(
+                        update={
+                            "agents": {
+                                **(main.agents or {}),
+                                "implementer": agent,
+                            }
+                        }
+                    )
+                    stored = self._store.put(
+                        str(task_key),
+                        stored.model_copy(
+                            update={
+                                "workstreams": {
+                                    **stored.workstreams,
+                                    "main": updated_main,
+                                }
+                            }
+                        ),
+                    )
+                except (StateFilesystemError, StateValidationError) as error:
+                    raise LifecycleError("cannot write Agent state") from error
             return TaskStartResolution(stored, task_key, workspace_id, tab_id, pane_id, cwd)
         except Exception:
             if created_workspace_id is not None:

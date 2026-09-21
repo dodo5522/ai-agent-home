@@ -4,10 +4,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-from herdr_task_state.model import HerdrReference, Task, TaskState, Workstream
+from herdr_task_state.model import (
+    AgentReference,
+    HerdrReference,
+    Task,
+    TaskKey,
+    TaskState,
+    Workstream,
+)
 from herdr_task_state.store import StateStore
 
 from herdr_task_lifecycle.cli import main as lifecycle_main
+from herdr_task_lifecycle.commands.start.agent import TaskAgentStarter
 from herdr_task_lifecycle.commands.start.service import TaskStarter, TaskStartResolution
 from herdr_task_lifecycle.errors import LifecycleError
 from herdr_task_lifecycle.herdr import (
@@ -146,6 +154,18 @@ class FakeHerdr(_HerdrOperations):
         self.panes[tab_id] = [PaneInfo(pane_id, tab_id) for pane_id in pane_ids]
 
 
+@dataclass
+class RecordingTaskAgentStarter:
+    calls: list[tuple[str, str, str]] = field(default_factory=list)
+    fail: bool = False
+
+    def ensure_implementer(self, task_key: TaskKey, task: Task, pane_id: str) -> AgentReference:
+        if self.fail:
+            raise LifecycleError("Agent start failed")
+        self.calls.append((str(task_key), task.title or "", pane_id))
+        return AgentReference(name="codex-issue-32-test")
+
+
 def test_herdr_implementations_explicitly_extend_operations_protocol() -> None:
     assert _HerdrOperations in HerdrClient.__bases__
     assert _HerdrOperations in FakeHerdr.__bases__
@@ -165,12 +185,18 @@ class StartFixture:
     primary_worktree: Path
     branch: str = "feat/issue-32-herdr-task-start"
 
-    def run(self, issue_number: int = 32, cwd: Path | None = None) -> TaskStartResolution:
+    def run(
+        self,
+        issue_number: int = 32,
+        cwd: Path | None = None,
+        agent_starter: TaskAgentStarter | None = None,
+    ) -> TaskStartResolution:
         return TaskStarter(
             self.state_path,
             runner=self.runner,
             herdr=self.herdr,
             task_roots_directory=self.tasks_directory,
+            agent_starter=agent_starter,
         ).start(issue_number, cwd or self.worktree)
 
     def git_command(self, cwd: Path, *arguments: str) -> list[str]:
@@ -575,6 +601,44 @@ def test_first_start_creates_and_persists(start_fixture: StartFixture) -> None:
     assert result.pane_id == "w9:p3"
     assert result.task.workstreams["main"].pane_ids == {"root": "w9:p3"}
     assert start_fixture.state().tasks["dodo5522/ai-agent-home#32"] == result.task
+
+
+def test_start_invokes_task_agent_and_persists_reference(start_fixture: StartFixture) -> None:
+    agent_starter = RecordingTaskAgentStarter()
+
+    result = start_fixture.run(32, agent_starter=agent_starter)
+
+    assert agent_starter.calls == [
+        ("dodo5522/ai-agent-home#32", "Herdr task-start", "w9:p3")
+    ]
+    assert result.task.workstreams["main"].agents == {
+        "implementer": AgentReference(name="codex-issue-32-test")
+    }
+
+
+def test_restarting_task_does_not_duplicate_task_agent(start_fixture: StartFixture) -> None:
+    agent_starter = RecordingTaskAgentStarter()
+
+    start_fixture.run(32, agent_starter=agent_starter)
+    result = start_fixture.run(32, agent_starter=agent_starter)
+
+    assert len(agent_starter.calls) == 2
+    assert result.task.workstreams["main"].agents == {
+        "implementer": AgentReference(name="codex-issue-32-test")
+    }
+
+
+def test_failed_task_agent_start_keeps_resources_for_retry(start_fixture: StartFixture) -> None:
+    agent_starter = RecordingTaskAgentStarter(fail=True)
+
+    with pytest.raises(LifecycleError, match="Agent start"):
+        start_fixture.run(32, agent_starter=agent_starter)
+
+    assert (
+        start_fixture.state().tasks["dodo5522/ai-agent-home#32"].workstreams["main"].agents
+        is None
+    )
+    assert not start_fixture.herdr.was_called("workspace", "close", "w9")
 
 
 def test_first_start_persists_worktree_branch_and_hash_label(start_fixture: StartFixture) -> None:
