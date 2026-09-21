@@ -34,7 +34,8 @@ class FakeHerdr:
         raise AssertionError("persistent reconcile does not prompt")
 
 
-def resolve(definition: AgentDefinition) -> PaneInfo:
+def resolve(definition: AgentDefinition, existing: AgentInfo | None) -> PaneInfo:
+    del existing
     pane_id = "w1:p1" if definition.cwd == Path("/work/main") else "w1:p2"
     return PaneInfo(pane_id, "w1:t1", "w1", definition.cwd, None)
 

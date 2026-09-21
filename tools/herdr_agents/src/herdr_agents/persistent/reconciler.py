@@ -3,7 +3,7 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from herdr_runtime import HerdrRuntimeError, PaneInfo
+from herdr_runtime import AgentInfo, HerdrRuntimeError, PaneInfo
 
 from ..errors import AgentManagementError
 from ..service import AgentManager, AgentTarget
@@ -25,7 +25,7 @@ class AgentReconciler:
     def __init__(
         self,
         manager: AgentManager,
-        pane_resolver: Callable[[AgentDefinition], PaneInfo],
+        pane_resolver: Callable[[AgentDefinition, AgentInfo | None], PaneInfo],
     ) -> None:
         self._manager = manager
         self._pane_resolver = pane_resolver
@@ -37,7 +37,8 @@ class AgentReconciler:
         failed: list[tuple[str, str]] = []
         for definition in definitions:
             try:
-                pane = self._pane_resolver(definition)
+                existing = self._manager.find(definition.name)
+                pane = self._pane_resolver(definition, existing)
                 if pane.workspace_id is None:
                     raise AgentManagementError(
                         f"Pane for Agent {definition.name} has no workspace identity"

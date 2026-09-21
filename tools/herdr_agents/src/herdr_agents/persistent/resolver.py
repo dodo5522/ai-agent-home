@@ -15,7 +15,11 @@ class PaneResolutionOperations(Protocol):
     def panes(self, workspace_id: str) -> list[PaneInfo]: ...
 
 
-def resolve_pane(definition: AgentDefinition, herdr: PaneResolutionOperations) -> PaneInfo:
+def resolve_pane(
+    definition: AgentDefinition,
+    herdr: PaneResolutionOperations,
+    occupied_pane_id: str | None = None,
+) -> PaneInfo:
     """Return the one unoccupied Pane matching configured Workspace and cwd."""
     workspaces = [item for item in herdr.workspaces() if item.label == definition.workspace]
     if not workspaces:
@@ -25,7 +29,8 @@ def resolve_pane(definition: AgentDefinition, herdr: PaneResolutionOperations) -
     panes = [
         pane
         for pane in herdr.panes(workspaces[0].workspace_id)
-        if pane.cwd == definition.cwd and pane.agent is None
+        if pane.cwd == definition.cwd
+        and (pane.agent is None or pane.pane_id == occupied_pane_id)
     ]
     if not panes:
         raise AgentManagementError(f"no available Pane matches Agent {definition.name}")

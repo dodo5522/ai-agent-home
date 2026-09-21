@@ -52,10 +52,13 @@ class AgentManager:
         if agent.cwd != target.cwd:
             raise AgentManagementError(f"Agent {target.name} has a different cwd")
 
+    def find(self, name: str) -> AgentInfo | None:
+        """Return one live Agent by exact managed name."""
+        return next((agent for agent in self._herdr.agents() if agent.name == name), None)
+
     def ensure(self, target: AgentTarget) -> EnsuredAgent:
         """Return the exact live Agent, starting it when absent."""
-        live = {agent.name: agent for agent in self._herdr.agents()}
-        existing = live.get(target.name)
+        existing = self.find(target.name)
         if existing is not None:
             self._validate(existing, target)
             return EnsuredAgent(existing, started=False)

@@ -6,7 +6,7 @@ import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from herdr_runtime import HerdrClient, HerdrRuntimeError, PaneInfo, SubprocessRunner
+from herdr_runtime import AgentInfo, HerdrClient, HerdrRuntimeError, PaneInfo, SubprocessRunner
 
 from ..errors import AgentManagementError
 from ..service import AgentManager
@@ -18,7 +18,7 @@ from .resolver import resolve_pane
 def reconcile(
     config_path: Path,
     manager: AgentManager,
-    pane_resolver: Callable[[AgentDefinition], PaneInfo],
+    pane_resolver: Callable[[AgentDefinition, AgentInfo | None], PaneInfo],
 ) -> AgentReconcileResult:
     """Load persistent definitions and reconcile them independently."""
     definitions = load_agent_definitions(config_path)
@@ -42,7 +42,15 @@ def _result_document(result: AgentReconcileResult) -> str:
 
 def _run(args: argparse.Namespace) -> int:
     herdr = HerdrClient(SubprocessRunner(), os.environ.get("HERDR_BIN", "herdr"))
-    result = reconcile(args.config, AgentManager(herdr), lambda item: resolve_pane(item, herdr))
+    result = reconcile(
+        args.config,
+        AgentManager(herdr),
+        lambda item, existing: resolve_pane(
+            item,
+            herdr,
+            None if existing is None else existing.pane_id,
+        ),
+    )
     print(_result_document(result))
     return 1 if result.failed else 0
 
