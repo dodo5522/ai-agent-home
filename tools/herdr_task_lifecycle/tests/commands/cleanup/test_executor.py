@@ -61,6 +61,8 @@ class FakeCleanupRunner:
     failure: str | None = None
     fail_worktree: Path | None = None
     remove_marker_after_worktree: Path | None = None
+    untracked_output: str = ""
+    assert_untracked_absent_before_worktree: Path | None = None
     calls: list[tuple[str, ...]] = field(default_factory=list)
     remove_calls: list[Path] = field(default_factory=list)
 
@@ -73,6 +75,8 @@ class FakeCleanupRunner:
         del cwd, environment
         command = tuple(arguments)
         self.calls.append(command)
+        if len(command) > 3 and command[3] == "status":
+            return CommandResult(0, self.untracked_output, "")
         if command == (
             "git",
             "-C",
@@ -96,6 +100,8 @@ class FakeCleanupRunner:
         ):
             self.events.append("worktree")
             target = Path(command[5])
+            if self.assert_untracked_absent_before_worktree is not None:
+                assert not self.assert_untracked_absent_before_worktree.exists()
             self.remove_calls.append(target)
             if self.failure == "worktree" or self.fail_worktree == target:
                 return CommandResult(1, "sensitive stdout", "sensitive stderr")
@@ -251,6 +257,25 @@ def test_execute_runs_tab_worktree_root_then_removes_state(
     assert result.completed_actions == ("tab", "worktree", "task_root")
     assert result.mapping_removed is True
     assert cleanup_fixture.state().tasks == {}
+
+
+def test_execute_removes_approved_untracked_files_before_worktree(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    generated = cleanup_fixture.worktree / "generated.txt"
+    generated.write_text("generated", encoding="utf-8")
+    cleanup_fixture.runner.untracked_output = "?? generated.txt\0"
+    cleanup_fixture.runner.assert_untracked_absent_before_worktree = generated
+
+    plan = cleanup_fixture.planner.plan(cleanup_fixture.task_key, remove_untracked=True)
+
+    result = cleanup_fixture.executor.execute(
+        plan,
+        cleanup_fixture.task_root,
+    )
+
+    assert result.completed_actions == ("tab", "untracked", "worktree", "task_root")
+    assert cleanup_fixture.events == ["tab", "worktree", "task_root", "state"]
 
 
 def test_execute_persists_partial_progress_and_retry_skips_completed_action(
@@ -523,8 +548,9 @@ def test_cleanup_execute_uses_resolved_confirmation_and_emits_result_json(
         def __init__(self, *args: object, **kwargs: object) -> None:
             pass
 
-        def plan(self, task_key: TaskKey) -> CleanupPlan:
+        def plan(self, task_key: TaskKey, *, remove_untracked: bool = False) -> CleanupPlan:
             assert task_key == cleanup_fixture.task_key
+            assert remove_untracked is False
             return plan
 
     class StubExecutor:

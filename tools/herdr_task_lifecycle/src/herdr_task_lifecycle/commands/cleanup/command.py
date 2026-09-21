@@ -43,7 +43,10 @@ def _run(args: argparse.Namespace) -> int:
     repository = resolve_repository(cwd, runner)
     task_key = TaskKey(repository, args.issue_number)
     task_state_path = state_path()
-    plan = CleanupPlanner(task_state_path, cwd, runner=runner).plan(task_key)
+    plan = CleanupPlanner(task_state_path, cwd, runner=runner).plan(
+        task_key,
+        remove_untracked=args.remove_untracked,
+    )
     if args.execute:
         if any(action.outcome == "blocked" for action in plan.actions):
             raise LifecycleError("cleanup plan contains a blocked action")
@@ -77,5 +80,10 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
         type=_absolute_path,
         metavar="PATH",
         help="Exact absolute task-root path from an approved plan.",
+    )
+    parser.add_argument(
+        "--remove-untracked",
+        action="store_true",
+        help="Include Git-untracked files in the approved cleanup plan.",
     )
     parser.set_defaults(handler=_run, command_parser=parser)

@@ -191,7 +191,9 @@ Tests are written first and cover at least:
 
 - `start` command migration and its existing no-duplicate, stale-state, and
   rollback contracts;
-- a cleanup plan that lists only managed resources and is read-only;
+- a cleanup plan that lists managed resources and, only with explicit
+  `--remove-untracked`, exact non-ignored Git-untracked paths within the
+  state-recorded worktrees;
 - successful cleanup in the defined action order;
 - rejection of workspace, Tab, worktree, or task-root identity mismatches;
 - prevention of root deletion without exact confirmation or marker/boundary
