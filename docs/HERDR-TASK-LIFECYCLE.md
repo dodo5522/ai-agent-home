@@ -10,7 +10,59 @@ The current release implements `herdr-task start`, `herdr-task cleanup`, and
 reserve future command boundaries; they are not implemented commands and must
 not be invoked.
 
-## Identity and resource model
+## Target operation and implementation handoff
+
+This workflow is under implementation, not an end-to-end capability already
+available. The status below describes the Issue #9 / PR #51 branch; it does not
+assert that these changes have been merged or deployed.
+
+The agreed target is one repository Workspace containing a persistent
+coordinator Tab and separate Issue Tabs. The coordinator accepts requests such
+as "work on Issue #99", arranges the task resources, delegates to that Issue's
+Agent, and reports progress/results. Its own conversation remains available
+after the Issue finishes. Each Issue has its own implementer and, when needed,
+reviewer Agent in separate Panes. Issue #99 and #100 never share a worker Agent
+or its conversation. A shared reviewer pool and its queue are not the target.
+
+`agents.toml` declares persistent coordinators. It is not an Issue-role
+template, worker allocation table, or concurrency limit. `role` currently is
+validated metadata only: setting `coordinator` does not install instructions or
+enable delegation. The example is an intended use, not implemented routing.
+
+Target sequence:
+
+1. Accept the request in the persistent repository coordinator.
+2. Prepare a marked task root and attached feature worktree, then call
+   `herdr-task start ISSUE --cwd WORKTREE`.
+3. Delegate implementation to the Issue Agent. Add a task-scoped reviewer Pane
+   and Agent when needed; collect findings and route fixes to that implementer.
+4. Keep Issue resources while the PR is open or under review.
+5. After the user's merge report, synchronize main, show a fresh cleanup plan,
+   obtain approval, and execute guarded cleanup. Keep the repository Workspace
+   and coordinator Tab/Pane/Agent. Non-PR work requires explicit completion
+   confirmation before cleanup planning.
+
+| Capability | Status on the #9 branch | Remaining work / owner |
+| --- | --- | --- |
+| Persistent Agent bootstrap | `herdr-agents reconcile` reads TOML and starts absent exact names on existing matching Panes; systemd calls it through the bootstrap wrapper. | No continuous Agent monitor; server-restart integration is #8. |
+| Repository coordinator | A configured named Agent can be started. | Coordinator instructions, request dispatch, progress/result collection, and ownership of its persistent Tab are not implemented; coordinate through #30. |
+| Task resources | `start` validates an already-created non-primary worktree, records task resources, and creates/reuses the repository Workspace and Issue Tab. | It does not create the Git worktree. Coordinator resource provisioning and persistent Workspace reuse need integration under #30/#11. Never adopt a label-only unmanaged Workspace. |
+| Issue implementer | `start` starts/reuses a task-unique Agent, validates its Pane/cwd, sends initial instructions, and persists its reference. | End-to-end coordinator handoff and completion reporting remain to be exercised; #9 tests use fakes, not a live two-Issue workflow. |
+| Issue reviewer | Role-keyed state can represent Agents; role Pane commands are reserved. | #12 owns review behavior/results; #30 coordinates role Pane creation and task-scoped identities. No reviewer allocation or shared-worker queue exists. |
+| Session recovery | Agent names are recorded. | #10 owns exact session mapping/resume; restarting an Agent is not session restoration. |
+| PR lifecycle and cleanup | Guarded cleanup exists; PR/review retention rules are documented. | PR metadata command is reserved. Integration must preserve the coordinator and other Issues, including when the final Issue mapping is removed (#30). |
+
+Next implementer: read #9, #10, #12 and #30 together. Keep this document as the
+operational source of truth; update this table when capabilities land. Design
+the persistent coordinator ownership/Workspace mapping before automating
+dispatch, then implement role Pane/reviewer integration and validate two
+simultaneous Issues end to end. Acceptance must demonstrate distinct worker
+names, Panes, task mappings and contexts; concurrent reviews; result delivery;
+and approved cleanup of one Issue without affecting the other or the
+coordinator. Package/CLI responsibility boundaries discussed during #9 remain
+to be decided; this operational agreement does not implement that refactor.
+
+## Task identity
 
 An Issue-backed task has the stable key `owner/name#issue-number`. Every task
 has a `main` workstream. A parallel workstream, when needed, has the stable key
@@ -46,7 +98,9 @@ stable key.
 A Workspace is a repository-wide managed resource shared by tasks in the same
 repository. `start` may reuse its stored ID from any same-repository task only
 after the live Workspace label matches that repository. All other resources
-are task- or workstream-scoped and are eligible for managed operations only
+managed by the task lifecycle are task- or workstream-scoped; persistent
+coordinator resources must stay outside Issue cleanup ownership. Task resources
+are eligible for managed operations only
 when their exact identifiers are recorded on the current task. Before a
 mutation, the CLI validates that the stored identifier still names the
 expected live resource; an exact target that is no longer live may be reported
@@ -119,15 +173,11 @@ cp .config/herdr/agents.toml.example .config/herdr/agents.toml
 Example definition:
 
 ```toml
-[agents.codex-main]
-role = "implementer"
+[agents.codex-coordinator]
+role = "coordinator"
 workspace = "dodo5522/ai-agent-home"
 cwd = "/home/takashi"
 
-[agents.codex-reviewer]
-role = "reviewer"
-workspace = "dodo5522/ai-agent-home"
-cwd = "/home/takashi/reviewer"
 ```
 
 Reconcile them with:
@@ -137,7 +187,7 @@ herdr-agents reconcile --config .config/herdr/agents.toml
 ```
 
 The reconciler matches exact Agent names. A live `codex` Agent does not satisfy
-`codex-main`, and a live Agent is never restarted merely because another Agent
+`codex-coordinator`, and a live Agent is never restarted merely because another Agent
 is missing. Each missing Agent is resolved to a validated Workspace/cwd Pane
 and started independently. Ambiguous or unavailable Panes are reported rather
 than selected by focus, display order, or fixed IDs. A missing configuration

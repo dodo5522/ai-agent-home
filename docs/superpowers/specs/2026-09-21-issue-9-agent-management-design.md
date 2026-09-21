@@ -31,6 +31,12 @@ model automatically from task complexity.
 
 ## Configuration
 
+Operational clarification: persistent definitions are intended for repository
+coordinators, not shared implementer/reviewer workers. Issue workers are
+task-scoped. Coordinator dispatch is not implemented. See the target-operation
+and implementation-handoff section in `docs/HERDR-TASK-LIFECYCLE.md` for current
+status and remaining integration work; it supersedes the original role examples.
+
 The managed Agent configuration is stored at the user-local
 `.config/herdr/agents.toml` and is read with Python's standard-library
 `tomllib`. The repository tracks `.config/herdr/agents.toml.example` only,
@@ -40,15 +46,11 @@ read-only for the reconciler. Each definition has a unique Agent name, role,
 workspace label, and absolute cwd:
 
 ```toml
-[agents.codex-main]
-role = "implementer"
+[agents.codex-coordinator]
+role = "coordinator"
 workspace = "dodo5522/ai-agent-home"
 cwd = "/home/takashi"
 
-[agents.codex-reviewer]
-role = "reviewer"
-workspace = "dodo5522/ai-agent-home"
-cwd = "/home/takashi"
 ```
 
 Agent names are the stable ownership key. Configuration validation rejects
