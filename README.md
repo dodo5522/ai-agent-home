@@ -170,11 +170,14 @@ mkdir -p -m 700 ~/.config/google-drive
 chmod 600 ~/.config/google-drive/credentials.json
 bin/google-drive-uploader auth
 bin/google-drive-uploader status
-bin/google-drive-uploader upload --folder-id FOLDER_ID FILE...
+bin/google-drive-uploader upload --folder-name ARTIFACT_NAME --parent-folder-id PARENT_FOLDER_ID FILE...
 ```
 
 `auth` はブラウザーで同意するためのURLを表示します。`upload` は再開可能アップロードを使い、
-完了後にDriveからファイル名とサイズを読み戻して検証します。共有設定は変更しません。
+最初に成果物名の新規フォルダを作成し、そのIDへファイルをアップロードします。完了後に
+Driveからファイル名とサイズを読み戻して検証します。共有設定は変更しません。
+同名フォルダやファイルは再利用・上書きしません。部分成功時は表示されたフォルダIDを
+使って未送信ファイルだけを `--folder-id` で再送します。
 既存フォルダーへの移動にも対応するため、OAuthスコープは `drive` を使用します。
 credentials、token、secret、private-keyを含む名前のファイルと、`.pem`、`.key`、`.p12`、`.pfx`ファイルは、
 明示的に指示されてもアップロードを拒否します。

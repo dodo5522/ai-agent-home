@@ -4,7 +4,7 @@ from pathlib import Path
 from googleapiclient.errors import HttpError
 
 from .auth import DriveConfig, DriveConfigurationError, load_credentials
-from .drive import account_email, build_drive_service, upload_files
+from .drive import account_email, build_drive_service, create_folder, upload_files
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,6 +16,8 @@ def build_parser() -> argparse.ArgumentParser:
     upload = subparsers.add_parser("upload", help="ファイルをDriveへアップロード")
     upload.add_argument("paths", nargs="+", type=Path)
     upload.add_argument("--folder-id")
+    upload.add_argument("--folder-name", help="新規作成する成果物フォルダ名")
+    upload.add_argument("--parent-folder-id", help="新規成果物フォルダの親フォルダID")
     return parser
 
 
@@ -32,7 +34,20 @@ def main() -> int:
             if args.command == "status":
                 print(f"認証済み: {account_email(service)}")
             else:
-                for uploaded in upload_files(service, args.paths, args.folder_id):
+                if args.folder_id and args.folder_name:
+                    raise DriveConfigurationError(
+                        "--folder-idと--folder-nameは同時に指定できません"
+                    )
+                folder_id = args.folder_id
+                if args.folder_name:
+                    folder = create_folder(service, args.folder_name, args.parent_folder_id)
+                    folder_id = folder["id"]
+                    print(
+                        f"フォルダ: {folder['name']} {folder['id']} {folder.get('webViewLink', '')}"
+                    )
+                elif args.parent_folder_id:
+                    raise DriveConfigurationError("--parent-folder-idには--folder-nameが必要です")
+                for uploaded in upload_files(service, args.paths, folder_id):
                     print(f"{uploaded['name']}: {uploaded['id']} {uploaded.get('webViewLink', '')}")
     except (DriveConfigurationError, HttpError) as error:
         print(f"エラー: {error}")

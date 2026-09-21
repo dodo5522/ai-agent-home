@@ -44,21 +44,23 @@ GUIで手直しした場合は `.blend` を正とし、再生成で失われる�
 ## Google Drive
 
 作品タスクで明示的にアップロードを依頼された場合のみ、既存entrypointを使います。
-保存先フォルダを確認して、最終ファイルを一回の呼び出しで指定できます。
+成果物固有のフォルダ名と任意の親フォルダIDを確認して、最終ファイルを一回の呼び出しで
+新規フォルダへ送れます。
 
 ```bash
 bin/google-drive-uploader status
-bin/google-drive-uploader upload --folder-id DRIVE_FOLDER_ID /absolute/path/build.py /absolute/path/model.blend /absolute/path/preview.png /absolute/path/RUN.md
+bin/google-drive-uploader upload --folder-name ARTIFACT_NAME --parent-folder-id PARENT_FOLDER_ID /absolute/path/build.py /absolute/path/model.blend /absolute/path/preview.png /absolute/path/RUN.md
 ```
 
 `DRIVE_FOLDER_ID` と各パスは実際の値へ置き換えます。必要な素材やexportも
 明示的なファイル一覧に追加します。ディレクトリの再帰uploadは対応していません。
 Pythonやメモに秘密情報がないことを確認し、認証ファイルは含めません。
 
-現行uploaderは新規ファイル作成と名前・サイズ照合を行い、同名ファイルを
-上書きしません。「最終形のみ」はアップロード対象の選別方針であり、
-過去のDriveファイルを自動削除する機能ではありません。
-部分成功時は返却IDを確認し、未送信ファイルだけを再送します。
+現行uploaderは成果物名の新規フォルダを作り、その中に新規ファイルを作成して
+名前・サイズ照合を行います。同名フォルダやファイルを再利用・上書きしません。
+「最終形のみ」はアップロード対象の選別方針であり、過去のDriveファイルを自動削除する
+機能ではありません。部分成功時は表示されたフォルダIDを使い、未送信ファイルだけを
+既存の `--folder-id` で再送します。
 
 ## 利用例と確認
 
