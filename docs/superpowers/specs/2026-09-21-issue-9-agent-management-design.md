@@ -24,6 +24,11 @@ remains Issue #10's responsibility. It also does not create Git worktrees or
 additional role Panes; those resources must already exist or be supplied by the
 caller and the existing task lifecycle.
 
+Model selection and task-complexity-based routing are explicitly out of scope.
+Issue #44 owns model/sub-agent routing for Blender work, including per-Agent
+model configuration and fallback policy. #9 must not infer that Codex chooses a
+model automatically from task complexity.
+
 ## Configuration
 
 The managed Agent configuration is stored at `.config/herdr/agents.toml` and is
@@ -97,7 +102,9 @@ task-to-Agent reference. #9 stores the managed Agent name and role mapping
 when task startup succeeds. It does not populate or interpret
 `codex_session_id`; session discovery and resume belong to #10. Existing state
 without an Agent entry remains valid and is upgraded on a successful
-task-scoped start.
+task-scoped start. It also does not add model fields; a future routing layer may
+provide Agent arguments at the startup boundary without making model selection
+part of Agent lifecycle ownership.
 
 ## Testing
 
