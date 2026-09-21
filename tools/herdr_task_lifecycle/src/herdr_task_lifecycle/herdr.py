@@ -33,6 +33,19 @@ class PaneInfo:
 
     pane_id: str
     tab_id: str
+    workspace_id: str | None = None
+    cwd: Path | None = None
+
+
+@dataclass(frozen=True)
+class AgentInfo:
+    """Identity fields returned for a live Herdr Agent."""
+
+    name: str
+    kind: str
+    pane_id: str
+    workspace_id: str
+    cwd: Path
 
 
 @dataclass(frozen=True)
@@ -70,6 +83,21 @@ class _HerdrOperations(Protocol):
 
     def panes_for_workspace(self, workspace_id: str, tab_id: str) -> list[PaneInfo]:
         """List panes belonging to one tab."""
+
+    def agents(self) -> list[AgentInfo]:
+        """List live Agents with validated identity fields."""
+
+    def panes(self, workspace_id: str) -> list[PaneInfo]:
+        """List panes in one workspace."""
+
+    def pane_get(self, pane_id: str) -> PaneInfo:
+        """Fetch one pane with validated identity fields."""
+
+    def agent_start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
+        """Start one named Agent on an explicit pane."""
+
+    def agent_prompt(self, name: str, text: str) -> None:
+        """Send text to one named Agent."""
 
 
 class _HerdrPlanningOperations(Protocol):
@@ -227,8 +255,23 @@ class HerdrClient(_HerdrOperations, _HerdrPlanningOperations):
         """Close a tab created by this invocation during rollback."""
         self._request(["tab", "close", tab_id])
 
-    def panes_for_workspace(self, workspace_id: str, tab_id: str) -> list[PaneInfo]:
-        """Return validated panes belonging to one tab in a workspace."""
+    def _pane_info(self, pane: Mapping[str, object]) -> PaneInfo:
+        cwd_value = pane.get("cwd")
+        cwd = None
+        if cwd_value is not None:
+            cwd_text = self._string(cast(Mapping[str, object], {"cwd": cwd_value}), "cwd")
+            cwd = Path(cwd_text)
+        workspace_value = pane.get("workspace_id")
+        workspace_id = workspace_value if isinstance(workspace_value, str) else None
+        return PaneInfo(
+            self._string(pane, "pane_id"),
+            self._string(pane, "tab_id"),
+            workspace_id,
+            cwd,
+        )
+
+    def panes(self, workspace_id: str) -> list[PaneInfo]:
+        """Return validated panes belonging to one workspace."""
         payload = self._request(["pane", "list", "--workspace", workspace_id])
         raw_panes = payload.get("panes")
         if not isinstance(raw_panes, list):
@@ -237,8 +280,61 @@ class HerdrClient(_HerdrOperations, _HerdrPlanningOperations):
         for raw_pane in raw_panes:
             if not isinstance(raw_pane, dict):
                 raise LifecycleError("Herdr pane response contains an invalid pane")
-            pane = cast(Mapping[str, object], raw_pane)
-            pane_info = PaneInfo(self._string(pane, "pane_id"), self._string(pane, "tab_id"))
-            if pane_info.tab_id == tab_id:
-                panes.append(pane_info)
+            pane = self._pane_info(cast(Mapping[str, object], raw_pane))
+            if pane.workspace_id is not None and pane.workspace_id != workspace_id:
+                raise LifecycleError("Herdr pane workspace identity mismatch")
+            panes.append(pane)
         return panes
+
+    def panes_for_workspace(self, workspace_id: str, tab_id: str) -> list[PaneInfo]:
+        """Return validated panes belonging to one tab in a workspace."""
+        return [pane for pane in self.panes(workspace_id) if pane.tab_id == tab_id]
+
+    def pane_get(self, pane_id: str) -> PaneInfo:
+        """Fetch one pane with validated identity fields."""
+        pane = self._member(self._request(["pane", "get", pane_id]), "pane")
+        actual_id = self._string(pane, "pane_id")
+        if actual_id != pane_id:
+            raise LifecycleError("Herdr pane identity mismatch")
+        return self._pane_info(pane)
+
+    def _agent_info(self, agent: Mapping[str, object]) -> AgentInfo:
+        session = agent.get("agent_session")
+        kind = "codex"
+        if isinstance(session, dict) and isinstance(session.get("agent"), str):
+            kind = self._string(cast(Mapping[str, object], session), "agent")
+        cwd_text = self._string(agent, "cwd")
+        return AgentInfo(
+            name=self._string(agent, "agent"),
+            kind=kind,
+            pane_id=self._string(agent, "pane_id"),
+            workspace_id=self._string(agent, "workspace_id"),
+            cwd=Path(cwd_text),
+        )
+
+    def agents(self) -> list[AgentInfo]:
+        """Return validated live Agents."""
+        payload = self._request(["agent", "list"])
+        raw_agents = payload.get("agents")
+        if not isinstance(raw_agents, list):
+            raise LifecycleError("Herdr response has no agents list")
+        agents: list[AgentInfo] = []
+        for raw_agent in raw_agents:
+            if not isinstance(raw_agent, dict):
+                raise LifecycleError("Herdr Agent response contains an invalid Agent")
+            agents.append(self._agent_info(cast(Mapping[str, object], raw_agent)))
+        return agents
+
+    def agent_start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
+        """Start one Agent on one explicit pane and validate its identity."""
+        payload = self._request(
+            ["agent", "start", name, "--kind", kind, "--pane", pane_id]
+        )
+        agent = self._agent_info(self._member(payload, "agent"))
+        if agent.name != name or agent.pane_id != pane_id or agent.kind != kind:
+            raise LifecycleError("Herdr Agent start response has inconsistent identity")
+        return agent
+
+    def agent_prompt(self, name: str, text: str) -> None:
+        """Send one prompt to an exact Agent name."""
+        self._request(["agent", "prompt", name, text])
