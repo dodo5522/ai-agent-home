@@ -5,9 +5,10 @@ tasks, from `herdr-task start` through approved cleanup. The low-level state
 schema and state-only CLI are documented in
 [`HERDR-TASK-STATE.md`](HERDR-TASK-STATE.md).
 
-The current `herdr-task` release implements only `start` and `cleanup`. The
-`pr` and `pane` namespaces described below reserve future command boundaries;
-they are not implemented commands and must not be invoked.
+The current release implements `herdr-task start`, `herdr-task cleanup`, and
+`herdr-agents reconcile`. The `pr` and `pane` namespaces described below
+reserve future command boundaries; they are not implemented commands and must
+not be invoked.
 
 ## Identity and resource model
 
@@ -23,7 +24,7 @@ stable key.
 | Main Tab | Primary Issue workstream; stored Herdr Tab ID. | `#<issue-number> <short-title>` | The resolved `start --cwd` worktree path. |
 | Parallel Tab | Independent future workstream; stored Herdr Tab ID. | `#<issue-number>/<workstream> <short-title>` | That workstream's registered worktree. |
 | Pane | One concurrent role in a Tab; stored by role to Herdr Pane ID. | Initial role key `root`; future roles include `implementer`, `reviewer`, `shell`, `test`, `server`, and `logs`. | The Tab worktree unless that role explicitly needs another path. |
-| Agent | One top-level Agent per Agent Pane; stored by role with its unique Agent name and optional Codex session ID. | A task-unique name plus the role; no global naming format is implemented yet. | Inherits its Pane cwd. |
+| Agent | One top-level Agent per Agent Pane; stored by role with its unique Agent name and optional Codex session ID. | A task-unique exact name plus the role. | Inherits its Pane cwd. |
 | Worktree | One registered non-primary Git worktree per active workstream; stored as an absolute path with its branch. | Branch metadata belongs to the workstream. | The worktree path itself. |
 | Task root | Container for one Issue's managed worktrees and artifacts; identified by its resolved absolute path and direct `.codex-task-root` file. | Directory name is descriptive, not ownership proof. | Not a command cwd; all worktree paths must resolve to this one root. |
 | Pull Request | Positive PR number attached to a workstream. | One workstream may hold multiple unique PR numbers and future status metadata. | Does not change cwd, task identity, or Tab identity. |
@@ -32,7 +33,7 @@ stable key.
 
 | Event | Required behavior |
 | --- | --- |
-| Issue work starts | Create the Issue feature worktree below its marked task root, then run `bin/herdr-task start ISSUE --cwd WORKTREE`; validate and record its path and branch before creating or reusing the state-recorded Workspace and main Issue Tab. |
+| Issue work starts | Create the Issue feature worktree below its marked task root, then run `bin/herdr-task start ISSUE --cwd WORKTREE`; validate and record its path and branch before creating or reusing the state-recorded Workspace and main Issue Tab, then start or recover the task's implementer Agent on the recorded root Pane. |
 | Independent workstream becomes necessary | Future `pane`/workstream support may add one parallel Tab and worktree. Do not create one merely for another process in the same workstream. |
 | Concurrent reviewer, server, logs, shell, or test role becomes necessary | Future `pane` support may add a role Pane to the existing Tab. Keep one top-level Agent per Agent Pane. |
 | PR opens or remains under review | Keep the same Issue task, Tab, worktree, task root, and state mapping. PR metadata is attached to its workstream; it does not start a replacement task. |
@@ -97,6 +98,51 @@ a worktree already registered to another task or workstream. A failed
 invocation rolls back only resources it created during that invocation and
 preserves previously managed resources. Read-only `herdr-task-state`
 operations never create Herdr resources.
+
+After the Workspace, Tab, and root Pane are persisted, `start` reconciles the
+Issue implementer Agent by exact managed Agent name and sends its initial
+instruction to that exact Agent. A repeated start does not create a duplicate
+Agent or send a duplicate initial instruction. If Agent startup fails, the
+Workspace, Tab, Pane, and task mapping remain available for retry; the command
+does not close state-owned resources as a rollback side effect.
+
+## Managing multiple Agents
+
+Long-lived managed Agents are declared in `.config/herdr/agents.toml`:
+
+```toml
+[agents.codex-main]
+role = "implementer"
+workspace = "dodo5522/ai-agent-home"
+cwd = "/home/takashi"
+
+[agents.codex-reviewer]
+role = "reviewer"
+workspace = "dodo5522/ai-agent-home"
+cwd = "/home/takashi/reviewer"
+```
+
+Reconcile them with:
+
+```bash
+herdr-agents reconcile --config .config/herdr/agents.toml
+```
+
+The reconciler matches exact Agent names. A live `codex` Agent does not satisfy
+`codex-main`, and a live Agent is never restarted merely because another Agent
+is missing. Each missing Agent is resolved to a validated Workspace/cwd Pane
+and started independently. Ambiguous or unavailable Panes are reported rather
+than selected by focus, display order, or fixed IDs. A missing configuration
+file safely reconciles no bootstrap Agents.
+
+Each Agent is reconciled independently; one failed Agent does not restart or
+invalidate another live Agent.
+
+Issue #9 owns Agent naming, startup, duplicate prevention, and individual
+recovery. Codex session discovery and resume belong to Issue #10. Model
+selection and complexity-based model/sub-agent routing belong to Issue #44;
+#9 does not assume that Codex automatically selects a model from task
+complexity.
 
 ## Planning and approving cleanup
 

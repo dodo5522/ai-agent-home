@@ -125,6 +125,16 @@ cleanup規則は上記のライフサイクル文書を参照してください�
 bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 ```
 
+長期 Agent の定義は `.config/herdr/agents.toml` に置き、名前単位で冪等に
+reconcile します。
+
+```bash
+herdr-agents reconcile --config .config/herdr/agents.toml
+```
+
+`herdr-task start` は Issue の root Pane に implementer Agent を起動・再利用します。
+Agent の session 復元は #10、モデル選択と複雑度ベースの routing は #44 の責務です。
+
 ## インストール確認
 
 ```bash

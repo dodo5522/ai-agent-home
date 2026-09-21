@@ -14,6 +14,13 @@ rg -q 'herdr-task cleanup ISSUE --plan' AGENTS.md
 rg -q 'non-primary Git worktree' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'worktree.*branch' docs/HERDR-TASK-LIFECYCLE.md
 rg -q '#<issue-number> <short-title>' docs/HERDR-TASK-LIFECYCLE.md
+rg -q 'herdr-agents reconcile' docs/HERDR-TASK-LIFECYCLE.md README.md
+rg -q '\.config/herdr/agents\.toml' docs/HERDR-TASK-LIFECYCLE.md README.md
+rg -q 'exact.*Agent name|Agent name.*exact' docs/HERDR-TASK-LIFECYCLE.md
+rg -q 'independently|per-Agent|Agent.*個別' docs/HERDR-TASK-LIFECYCLE.md
+rg -q 'Issue implementer|implementer Agent' docs/HERDR-TASK-LIFECYCLE.md
+rg -q '#44.*model|model.*#44' docs/HERDR-TASK-LIFECYCLE.md
+rg -q '#10.*session|session.*#10' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'create.*worktree.*then.*herdr-task start' AGENTS.md
 test ! -e docs/HERDR-TASK-START.md
 test ! -e bin/herdr-task-start
