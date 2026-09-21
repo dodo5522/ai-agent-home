@@ -19,7 +19,10 @@ rg -q '\.config/herdr/agents\.toml' docs/HERDR-TASK-LIFECYCLE.md README.md
 test -f .config/herdr/agents.toml.example
 rg -q 'agents\.toml\.example' README.md docs/HERDR-TASK-LIFECYCLE.md
 rg -q '^\.config/herdr/agents\.toml$' .gitignore
-test ! -e .config/herdr/agents.toml
+git check-ignore -q .config/herdr/agents.toml
+rg -q 'herdr-agents.*path = "../herdr_agents"' tools/herdr_task_lifecycle/pyproject.toml
+rg -q 'herdr-runtime.*path = "../herdr_runtime"' tools/herdr_task_lifecycle/pyproject.toml
+! rg -q '^herdr-agents[[:space:]]*=' tools/herdr_task_lifecycle/pyproject.toml
 rg -q 'exact.*Agent name|Agent name.*exact' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'independently|per-Agent|Agent.*個別' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'Issue implementer|implementer Agent' docs/HERDR-TASK-LIFECYCLE.md

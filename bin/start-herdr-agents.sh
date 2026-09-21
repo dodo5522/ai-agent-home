@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HERDR_BIN=${HERDR_BIN:-/home/takashi/.local/share/mise/shims/herdr}
-UV_BIN=${UV_BIN:-/home/takashi/.local/share/mise/shims/uv}
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 HERDR_AGENT_CONFIG=${HERDR_AGENT_CONFIG:-${WORKSPACE_CWD:-/home/takashi}/.config/herdr/agents.toml}
 LOCK_FILE=${LOCK_FILE:-${XDG_RUNTIME_DIR:-/tmp}/herdr-agents.lock}
 SERVER_WAIT_ATTEMPTS=${SERVER_WAIT_ATTEMPTS:-60}
@@ -36,5 +36,4 @@ if [[ $server_ready != true ]]; then
 fi
 
 log "reconciling configured Herdr Agents from $HERDR_AGENT_CONFIG"
-HERDR_BIN="$HERDR_BIN" "$UV_BIN" run --project "$(dirname "${BASH_SOURCE[0]}")/../tools/herdr_task_lifecycle" \
-    herdr-agents reconcile --config "$HERDR_AGENT_CONFIG"
+HERDR_BIN="$HERDR_BIN" "$SCRIPT_DIR/herdr-agents" reconcile --config "$HERDR_AGENT_CONFIG"

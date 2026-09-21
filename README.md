@@ -146,6 +146,20 @@ herdr-agents reconcile --config .config/herdr/agents.toml
 `herdr-task start` は Issue の root Pane に implementer Agent を起動・再利用します。
 Agent の session 復元は #10、モデル選択と複雑度ベースの routing は #44 の責務です。
 
+実装は責務ごとに分離されています。
+
+```text
+herdr_task_lifecycle ──> herdr_agents ──> herdr_runtime
+         │                                  ▲
+         ├──────────────────────────────────┘
+         └──────────────> herdr_task_state
+```
+
+`herdr_agents` は名前指定の検索・起動・配置検証・promptを提供する共通機能です。
+Issue用Agentがこれを利用しても常設にはなりません。`agents.toml`を読み込む
+`herdr-agents reconcile`だけが、systemd bootstrapで復旧する常設coordinatorを
+管理します。
+
 ## インストール確認
 
 ```bash

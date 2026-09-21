@@ -10,6 +10,20 @@ The current release implements `herdr-task start`, `herdr-task cleanup`, and
 reserve future command boundaries; they are not implemented commands and must
 not be invoked.
 
+The implementation dependency direction is:
+
+```text
+herdr_task_lifecycle -> herdr_agents -> herdr_runtime
+                     -> herdr_runtime
+                     -> herdr_task_state
+```
+
+`herdr_agents` is the reusable exact-name Agent layer. Using it from task
+lifecycle does not make an Issue Agent persistent. Persistence is a caller
+policy: the `herdr_agents.persistent` TOML reconciler is used for coordinators,
+while lifecycle stores Issue Agents in task state and removes their resources
+through approved Issue cleanup.
+
 ## Target operation and implementation handoff
 
 This workflow is under implementation, not an end-to-end capability already

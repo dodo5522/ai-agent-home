@@ -103,10 +103,14 @@ journalctl --user -u herdr.service -u herdr-agents.service -b --no-pager
 1. Herdr server が running / compatible になるまで最大120秒待機
 2. `.config/herdr/agents.toml` の定義を読み込む（初回は
    `.config/herdr/agents.toml.example` をコピーして作成）
-3. Agent 名を完全一致で live Agent 一覧と照合する
-4. 不在 Agent だけを Workspace/cwd に一致する明示 Pane で起動する
-5. 1 Agent の起動失敗を他 Agent の再起動理由にしない
+3. 独立した `tools/herdr_agents` の `herdr-agents reconcile` を実行する
+4. Agent 名を完全一致で live Agent 一覧と照合する
+5. 不在 Agent だけを Workspace/cwd に一致する明示 Pane で起動する
+6. 1 Agent の起動失敗を他 Agent の再起動理由にしない
 
+`herdr_agents` は共通Agent操作を提供しますが、このsystemd経路でTOMLから
+reconcileされたAgentだけが常設対象です。Issue Agentは`herdr_task_lifecycle`が
+同じ共通操作を利用して起動し、Issueのtask stateとcleanupに従います。
 この bootstrap は Agent 名単位の起動・復旧だけを担当します。Codex
 session の対応付けと resume は #10、モデル選択と複雑度ベースの routing は
 #44 の責務です。
