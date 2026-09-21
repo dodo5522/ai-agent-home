@@ -4,6 +4,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import (
+    CommandResult,
+    CreatedResources,
+    HerdrClient,
+    HerdrError,
+    PaneInfo,
+    TabInfo,
+    WorkspaceInfo,
+)
 from herdr_task_state.model import (
     AgentReference,
     HerdrReference,
@@ -18,16 +27,8 @@ from herdr_task_lifecycle.cli import main as lifecycle_main
 from herdr_task_lifecycle.commands.start.agent import TaskAgentStarter
 from herdr_task_lifecycle.commands.start.service import TaskStarter, TaskStartResolution
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import (
-    CreatedResources,
-    HerdrClient,
-    PaneInfo,
-    TabInfo,
-    WorkspaceInfo,
-    _HerdrOperations,
-)
+from herdr_task_lifecycle.herdr_operations import HerdrOperations
 from herdr_task_lifecycle.identity import load_issue_title, resolve_repository, short_title
-from herdr_task_lifecycle.runner import CommandResult
 
 
 @dataclass
@@ -84,7 +85,7 @@ class RecordingRunner:
 
 
 @dataclass
-class FakeHerdr(_HerdrOperations):
+class FakeHerdr(HerdrOperations):
     calls: list[tuple[str, ...]] = field(default_factory=list)
     workspaces: dict[str, WorkspaceInfo] = field(default_factory=dict)
     tabs: dict[str, TabInfo] = field(default_factory=dict)
@@ -166,9 +167,8 @@ class RecordingTaskAgentStarter:
         return AgentReference(name="codex-issue-32-test")
 
 
-def test_herdr_implementations_explicitly_extend_operations_protocol() -> None:
-    assert _HerdrOperations in HerdrClient.__bases__
-    assert _HerdrOperations in FakeHerdr.__bases__
+def test_fake_herdr_explicitly_extends_operations_protocol() -> None:
+    assert HerdrOperations in FakeHerdr.__bases__
 
 
 @dataclass
@@ -569,7 +569,7 @@ def test_herdr_failures_and_malformed_json_are_rejected_without_echoing_output()
         ["herdr", "workspace", "get", "w9"],
         CommandResult(1, "secret stdout", "secret stderr"),
     )
-    with pytest.raises(LifecycleError) as error:
+    with pytest.raises(HerdrError) as error:
         HerdrClient(runner).workspace_get("w9")
     assert "secret" not in str(error.value)
 
@@ -578,7 +578,7 @@ def test_herdr_failures_and_malformed_json_are_rejected_without_echoing_output()
         ["herdr", "workspace", "get", "w9"],
         CommandResult(0, "not json", ""),
     )
-    with pytest.raises(LifecycleError, match="JSON"):
+    with pytest.raises(HerdrError, match="JSON"):
         HerdrClient(malformed).workspace_get("w9")
 
 
@@ -589,7 +589,7 @@ def test_herdr_response_missing_identity_is_rejected() -> None:
         CommandResult(0, json.dumps({"result": {"workspace": {"label": "owner/repo"}}}), ""),
     )
 
-    with pytest.raises(LifecycleError, match="workspace"):
+    with pytest.raises(HerdrError, match="workspace"):
         HerdrClient(runner).workspace_get("w9")
 
 

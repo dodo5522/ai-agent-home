@@ -3,9 +3,9 @@
 import argparse
 from pathlib import Path
 
+from herdr_runtime import HerdrClient, SubprocessRunner
+
 from ...errors import ExitCode
-from ...herdr import HerdrClient
-from ...runner import SubprocessRunner
 from ...state import state_path
 from .agent import TaskAgentStarter
 from .service import TaskStarter

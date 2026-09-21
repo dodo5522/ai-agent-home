@@ -2,11 +2,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import AgentInfo
 from herdr_task_state.model import AgentReference, HerdrReference, Task, TaskKey, Workstream
 
 from herdr_task_lifecycle.commands.start.agent import TaskAgentStarter, task_agent_name
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import AgentInfo
 
 
 def task() -> Task:

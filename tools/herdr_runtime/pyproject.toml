@@ -3,28 +3,17 @@ requires = ["setuptools>=75.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "herdr-task"
+name = "herdr-runtime"
 version = "0.1.0"
-description = "Manage the Herdr task lifecycle"
+description = "Shared typed runtime boundaries for Herdr automation"
 requires-python = ">=3.14"
-dependencies = [
-    "herdr-runtime",
-    "herdr-task-state",
-]
-
-[project.scripts]
-herdr-task = "herdr_task_lifecycle.cli:main"
-herdr-agents = "herdr_task_lifecycle.agents.cli:main"
+dependencies = []
 
 [dependency-groups]
 dev = [
     "pytest==8.4.2",
     "ruff==0.14.10",
 ]
-
-[tool.uv.sources]
-herdr-runtime = { path = "../herdr_runtime" }
-herdr-task-state = { path = "../herdr_task_state" }
 
 [tool.setuptools]
 package-dir = {"" = "src"}

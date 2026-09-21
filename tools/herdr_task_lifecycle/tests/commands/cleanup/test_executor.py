@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import CommandResult, TabInfo, WorkspaceInfo
 from herdr_task_state.model import (
     CleanupProgress,
     HerdrReference,
@@ -23,8 +24,6 @@ from herdr_task_lifecycle.commands.cleanup.planner import (
     CleanupPlanner,
 )
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import TabInfo, WorkspaceInfo
-from herdr_task_lifecycle.runner import CommandResult
 from herdr_task_lifecycle.state import TaskStateRepository
 
 

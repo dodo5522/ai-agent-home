@@ -6,9 +6,9 @@ import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from herdr_runtime import HerdrClient, HerdrRuntimeError, SubprocessRunner
+
 from ..errors import LifecycleError
-from ..herdr import HerdrClient
-from ..runner import SubprocessRunner
 from .config import AgentDefinition, load_agent_definitions
 from .reconciler import AgentOperations, AgentReconciler, AgentReconcileResult
 
@@ -78,6 +78,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = parser.parse_args(argv)
         return args.handler(args)
-    except LifecycleError as error:
+    except (LifecycleError, HerdrRuntimeError) as error:
         parser.error(str(error))
         return 2

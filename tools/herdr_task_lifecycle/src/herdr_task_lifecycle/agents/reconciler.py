@@ -4,8 +4,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from herdr_runtime import AgentInfo, HerdrError
+
 from ..errors import LifecycleError
-from ..herdr import AgentInfo
 from .config import AgentDefinition
 
 
@@ -52,7 +53,7 @@ class AgentReconciler:
             try:
                 pane_id = self._pane_resolver(definition)
                 self._herdr.agent_start(definition.name, pane_id)
-            except LifecycleError as error:
+            except (LifecycleError, HerdrError) as error:
                 failed.append((definition.name, str(error)))
                 continue
             started.append(definition.name)

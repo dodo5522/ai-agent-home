@@ -4,10 +4,10 @@ import hashlib
 from pathlib import Path
 from typing import Protocol
 
+from herdr_runtime import AgentInfo
 from herdr_task_state.model import AgentReference, Task, TaskKey
 
 from ...errors import LifecycleError
-from ...herdr import AgentInfo
 
 
 class TaskAgentOperations(Protocol):

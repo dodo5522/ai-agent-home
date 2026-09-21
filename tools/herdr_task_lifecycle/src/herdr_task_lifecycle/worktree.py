@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from herdr_runtime import CommandResult, CommandRunner
+
 from .errors import LifecycleError
-from .runner import CommandResult, CommandRunner
 
 TASK_ROOTS_DIRECTORY = Path("/home/takashi/work/tasks")
 

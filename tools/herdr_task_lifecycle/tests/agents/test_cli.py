@@ -1,9 +1,10 @@
 from pathlib import Path
 
+from herdr_runtime import AgentInfo
+
 from herdr_task_lifecycle.agents.cli import reconcile
 from herdr_task_lifecycle.agents.config import AgentDefinition
 from herdr_task_lifecycle.agents.reconciler import AgentReconcileResult
-from herdr_task_lifecycle.herdr import AgentInfo
 
 
 class FakeHerdr:

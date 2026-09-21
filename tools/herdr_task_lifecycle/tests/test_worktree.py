@@ -3,9 +3,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import CommandResult
 
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.runner import CommandResult
 from herdr_task_lifecycle.worktree import (
     WorktreeRegistration,
     resolve_managed_worktree,

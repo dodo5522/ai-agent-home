@@ -6,11 +6,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
+from herdr_runtime import CommandRunner, HerdrClient, HerdrError, SubprocessRunner
 from herdr_task_state.model import Task, TaskKey
 
 from ...errors import LifecycleError
-from ...herdr import HerdrClient, _HerdrPlanningOperations
-from ...runner import CommandRunner, SubprocessRunner
+from ...herdr_operations import HerdrPlanningOperations
 from ...state import TaskStateRepository
 
 CleanupActionName = Literal["tab", "untracked", "worktree", "task_root"]
@@ -95,7 +95,7 @@ class CleanupPlanner:
         repository_path: Path,
         *,
         runner: CommandRunner | None = None,
-        herdr: _HerdrPlanningOperations | None = None,
+        herdr: HerdrPlanningOperations | None = None,
         tasks_directory: Path = _TASKS_DIRECTORY,
     ) -> None:
         self._runner = runner or SubprocessRunner()
@@ -174,7 +174,7 @@ class CleanupPlanner:
                     return CleanupActionPlan(
                         "tab", "blocked", target, "live tab label does not match stored tab label"
                     )
-        except LifecycleError:
+        except HerdrError:
             return CleanupActionPlan(
                 "tab", "blocked", target, "live Herdr identity could not be validated"
             )

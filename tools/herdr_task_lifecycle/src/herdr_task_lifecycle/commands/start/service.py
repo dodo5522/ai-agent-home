@@ -4,6 +4,14 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from herdr_runtime import (
+    CommandRunner,
+    CreatedResources,
+    HerdrClient,
+    HerdrError,
+    SubprocessRunner,
+    WorkspaceInfo,
+)
 from herdr_task_state.model import (
     HerdrReference,
     StateValidationError,
@@ -15,9 +23,8 @@ from herdr_task_state.model import (
 from herdr_task_state.store import StateFilesystemError, StateStore
 
 from ...errors import LifecycleError
-from ...herdr import CreatedResources, HerdrClient, WorkspaceInfo, _HerdrOperations
+from ...herdr_operations import HerdrOperations
 from ...identity import load_issue_title, resolve_repository, short_title
-from ...runner import CommandRunner, SubprocessRunner
 from ...worktree import TASK_ROOTS_DIRECTORY, resolve_managed_worktree
 from .agent import TaskAgentStarter
 
@@ -41,7 +48,7 @@ class TaskStarter:
         self,
         state_path: Path,
         runner: CommandRunner | None = None,
-        herdr: _HerdrOperations | None = None,
+        herdr: HerdrOperations | None = None,
         task_roots_directory: Path = TASK_ROOTS_DIRECTORY,
         agent_starter: TaskAgentStarter | None = None,
     ) -> None:
@@ -73,7 +80,7 @@ class TaskStarter:
         for workspace_id in candidates:
             try:
                 workspace = self._herdr.workspace_get(workspace_id)
-            except LifecycleError:
+            except (HerdrError, LifecycleError):
                 continue
             if workspace.label == repository:
                 valid.append(workspace)
@@ -98,7 +105,7 @@ class TaskStarter:
             return None
         try:
             tab = self._herdr.tab_get(tab_id)
-        except LifecycleError:
+        except (HerdrError, LifecycleError):
             return None
         if tab.workspace_id != workspace_id:
             return None
@@ -257,11 +264,11 @@ class TaskStarter:
             if created_workspace_id is not None:
                 try:
                     self._herdr.workspace_close(created_workspace_id)
-                except LifecycleError:
+                except (HerdrError, LifecycleError):
                     pass
             elif created_tab_id is not None:
                 try:
                     self._herdr.tab_close(created_tab_id)
-                except LifecycleError:
+                except (HerdrError, LifecycleError):
                     pass
             raise

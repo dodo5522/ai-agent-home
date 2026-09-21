@@ -5,14 +5,13 @@ from dataclasses import FrozenInstanceError, dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import CommandResult, HerdrClient, TabInfo, WorkspaceInfo
 from herdr_task_state.model import HerdrReference, Task, TaskKey, Workstream
 from herdr_task_state.store import StateStore
 
 from herdr_task_lifecycle.cli import main as lifecycle_main
 from herdr_task_lifecycle.commands.cleanup.planner import CleanupPlanner
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import HerdrClient, TabInfo, WorkspaceInfo
-from herdr_task_lifecycle.runner import CommandResult
 
 
 @dataclass

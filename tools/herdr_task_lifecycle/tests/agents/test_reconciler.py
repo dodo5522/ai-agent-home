@@ -3,11 +3,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import AgentInfo
 
 from herdr_task_lifecycle.agents.config import AgentDefinition
 from herdr_task_lifecycle.agents.reconciler import AgentReconciler
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import AgentInfo
 
 
 def definition(name: str) -> AgentDefinition:

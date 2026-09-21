@@ -4,10 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-
-from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import HerdrClient
-from herdr_task_lifecycle.runner import CommandResult
+from herdr_runtime import CommandResult, HerdrClient, HerdrError
 
 
 @dataclass
@@ -84,7 +81,7 @@ def test_rejects_agent_identity_mismatch() -> None:
         ),
     )
 
-    with pytest.raises(LifecycleError, match="agent"):
+    with pytest.raises(HerdrError, match="agent"):
         HerdrClient(runner).agents()
 
 
