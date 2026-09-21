@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 herdr-task = "herdr_task_lifecycle.cli:main"
+herdr-agents = "herdr_task_lifecycle.agents.cli:main"
 
 [dependency-groups]
 dev = [

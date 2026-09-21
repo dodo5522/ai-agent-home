@@ -35,6 +35,7 @@ class PaneInfo:
     tab_id: str
     workspace_id: str | None = None
     cwd: Path | None = None
+    agent: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,9 @@ class _HerdrOperations(Protocol):
 
     def workspace_get(self, workspace_id: str) -> WorkspaceInfo:
         """Fetch one workspace."""
+
+    def workspaces(self) -> list[WorkspaceInfo]:
+        """List workspaces."""
 
     def workspace_create(self, label: str, cwd: Path) -> CreatedResources:
         """Create one workspace."""
@@ -113,11 +117,12 @@ class _HerdrPlanningOperations(Protocol):
 class HerdrClient(_HerdrOperations, _HerdrPlanningOperations):
     """Typed adapter for the Herdr JSON CLI interface."""
 
-    def __init__(self, runner: CommandRunner) -> None:
+    def __init__(self, runner: CommandRunner, herdr_bin: str = "herdr") -> None:
         self._runner = runner
+        self._herdr_bin = herdr_bin
 
     def _request(self, arguments: Sequence[str]) -> Mapping[str, object]:
-        result = self._runner.run(["herdr", *arguments])
+        result = self._runner.run([self._herdr_bin, *arguments])
         if result.returncode != 0:
             raise LifecycleError(f"Herdr command failed: {arguments[0]}")
         try:
@@ -152,6 +157,25 @@ class HerdrClient(_HerdrOperations, _HerdrPlanningOperations):
         if actual_id != workspace_id:
             raise LifecycleError("Herdr workspace identity mismatch")
         return WorkspaceInfo(actual_id, self._string(workspace, "label"))
+
+    def workspaces(self) -> list[WorkspaceInfo]:
+        """Return validated live workspaces."""
+        payload = self._request(["workspace", "list"])
+        raw_workspaces = payload.get("workspaces")
+        if not isinstance(raw_workspaces, list):
+            raise LifecycleError("Herdr response has no workspaces list")
+        workspaces: list[WorkspaceInfo] = []
+        for raw_workspace in raw_workspaces:
+            if not isinstance(raw_workspace, dict):
+                raise LifecycleError("Herdr workspace response contains an invalid workspace")
+            workspace = cast(Mapping[str, object], raw_workspace)
+            workspaces.append(
+                WorkspaceInfo(
+                    self._string(workspace, "workspace_id"),
+                    self._string(workspace, "label"),
+                )
+            )
+        return workspaces
 
     def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
         """Find one workspace by opaque ID without inferring ownership from labels."""
@@ -263,11 +287,14 @@ class HerdrClient(_HerdrOperations, _HerdrPlanningOperations):
             cwd = Path(cwd_text)
         workspace_value = pane.get("workspace_id")
         workspace_id = workspace_value if isinstance(workspace_value, str) else None
+        agent_value = pane.get("agent")
+        agent = agent_value if isinstance(agent_value, str) else None
         return PaneInfo(
             self._string(pane, "pane_id"),
             self._string(pane, "tab_id"),
             workspace_id,
             cwd,
+            agent,
         )
 
     def panes(self, workspace_id: str) -> list[PaneInfo]:

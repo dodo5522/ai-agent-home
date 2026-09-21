@@ -123,6 +123,21 @@ test_runtime_paths_use_mise_shims() {
         "Herdr bootstrap uses the mise shim"
 }
 
+test_herdr_agent_bootstrap_reconciles_named_agents() {
+    local bootstrap
+    bootstrap=$(cat "$REPO_ROOT/bin/start-herdr-agents.sh")
+
+    assert_contains "$bootstrap" 'herdr-agents reconcile' \
+        "Herdr bootstrap delegates to named-Agent reconciliation"
+    assert_contains "$bootstrap" 'HERDR_AGENT_CONFIG' \
+        "Herdr bootstrap passes the Agent configuration path"
+    if [[ $bootstrap == *'select(.agent == "codex")'* ]]; then
+        fail "Herdr bootstrap does not use the global bare-codex guard"
+    else
+        pass "Herdr bootstrap does not use the global bare-codex guard"
+    fi
+}
+
 test_herdr_skill_is_installed_with_safety_contract() {
     local skill
 
@@ -340,6 +355,7 @@ test_blender_batch_installation
 test_help_documents_non_mutating_mode
 test_unknown_option_fails
 test_runtime_paths_use_mise_shims
+test_herdr_agent_bootstrap_reconciles_named_agents
 test_herdr_skill_is_installed_with_safety_contract
 test_herdr_skill_records_reproducible_upstream
 test_herdr_skill_setup_and_update_are_documented
