@@ -31,12 +31,46 @@ class DriveFile(TypedDict):
     parents: NotRequired[list[str]]
 
 
+class DriveFolder(TypedDict):
+    id: str
+    name: str
+    mimeType: str
+    webViewLink: NotRequired[str]
+    parents: NotRequired[list[str]]
+
+
 class UploadResponse(TypedDict):
     id: str
 
 
 def build_drive_service(credentials: Credentials) -> Resource:
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
+
+
+def create_folder(service: Resource, name: str, parent_id: str | None = None) -> DriveFolder:
+    folder_name = name.strip()
+    if not folder_name:
+        raise DriveConfigurationError("フォルダ名を指定してください")
+
+    metadata: dict[str, str | list[str]] = {
+        "name": folder_name,
+        "mimeType": "application/vnd.google-apps.folder",
+    }
+    if parent_id:
+        metadata["parents"] = [parent_id]
+    response = cast(
+        DriveFolder,
+        service.files()
+        .create(body=metadata, fields="id,name,mimeType,webViewLink,parents")
+        .execute(),
+    )
+    if (
+        response.get("id") is None
+        or response.get("name") != folder_name
+        or response.get("mimeType") != "application/vnd.google-apps.folder"
+    ):
+        raise DriveConfigurationError("Driveフォルダの作成結果を検証できません")
+    return response
 
 
 def account_email(service: Resource) -> str:

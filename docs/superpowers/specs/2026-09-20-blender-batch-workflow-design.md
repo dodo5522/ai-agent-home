@@ -115,21 +115,24 @@ exports, required input assets, and `RUN.md` as the standard handoff set.
 Artwork Git history is optional and not required. The set must be copied to a
 durable location before the temporary Issue task root is cleaned up.
 
-For an explicit upload request, use only:
+For an explicit upload request, create a new folder named after the artifact
+and upload the final set into it:
 
 ```bash
-bin/google-drive-uploader upload --folder-id FOLDER_ID \
+bin/google-drive-uploader upload --folder-name ARTIFACT_NAME \
+  --parent-folder-id PARENT_FOLDER_ID \
   /absolute/path/build.py \
   /absolute/path/model.blend \
   /absolute/path/preview.png \
   /absolute/path/RUN.md
 ```
 
-Add requested exports and input assets as explicit paths. The uploader creates
-new files and verifies their returned name and size; it does not overwrite or
-delete an existing same-named Drive file. If an upload partially succeeds,
-record returned IDs/links and send only missing files on retry. Never upload
-credentials, tokens, private keys, or hidden secrets.
+`--parent-folder-id` is optional. Add requested exports and input assets as
+explicit paths. The uploader creates a new folder and new files, then verifies
+their returned names and sizes; it does not reuse, overwrite, or delete an
+existing same-named folder or file. If an upload partially succeeds, record the
+folder ID and returned file IDs/links and send only missing files on retry.
+Never upload credentials, tokens, private keys, or hidden secrets.
 
 ## Deliverable
 
