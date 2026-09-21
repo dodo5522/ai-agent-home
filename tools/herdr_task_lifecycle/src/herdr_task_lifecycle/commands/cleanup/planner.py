@@ -13,7 +13,7 @@ from ...herdr import HerdrClient, _HerdrPlanningOperations
 from ...runner import CommandRunner, SubprocessRunner
 from ...state import TaskStateRepository
 
-CleanupActionName = Literal["tab", "worktree", "task_root"]
+CleanupActionName = Literal["tab", "untracked", "worktree", "task_root"]
 CleanupOutcome = Literal["delete", "already_absent", "blocked"]
 _TASKS_DIRECTORY = Path("/home/takashi/work/tasks")
 
@@ -34,7 +34,7 @@ class CleanupPlan:
 
     task_key: TaskKey
     task_root: Path | None
-    actions: tuple[CleanupActionPlan, CleanupActionPlan, CleanupActionPlan]
+    actions: tuple[CleanupActionPlan, ...]
 
     def to_json(self) -> str:
         """Serialize the plan to stable human-reviewable JSON."""
@@ -56,6 +56,18 @@ def _targets(values: list[str]) -> str:
     if len(values) == 1:
         return values[0]
     return json.dumps(values, ensure_ascii=False)
+
+
+def _parse_targets(value: str) -> tuple[str, ...]:
+    if not value:
+        return ()
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError:
+        return (value,)
+    if isinstance(decoded, list) and all(isinstance(item, str) for item in decoded):
+        return tuple(decoded)
+    return (value,)
 
 
 def _git_markers(root: Path) -> list[Path]:
@@ -308,6 +320,84 @@ class CleanupPlanner:
             raise LifecycleError("cleanup worktree target is blocked")
         return action.outcome
 
+    @staticmethod
+    def _parse_untracked_status(worktree: Path, output: str) -> list[Path]:
+        paths: list[Path] = []
+        for record in output.split("\0"):
+            if not record or not record.startswith("?? "):
+                continue
+            relative = Path(record[3:])
+            if relative.is_absolute() or ".." in relative.parts:
+                raise LifecycleError("Git reported an unsafe untracked path")
+            if relative.parts and relative.parts[0] == ".git":
+                raise LifecycleError("Git reported an unsafe untracked path")
+            path = worktree / relative
+            if path == worktree:
+                raise LifecycleError("Git reported the worktree itself as untracked")
+            paths.append(path)
+        return sorted(set(paths), key=str)
+
+    def _plan_untracked(
+        self,
+        worktrees: list[Path],
+        worktree_action: CleanupActionPlan,
+    ) -> CleanupActionPlan:
+        target = ""
+        if worktree_action.outcome == "blocked":
+            return CleanupActionPlan(
+                "untracked", "blocked", target, "stored worktree cleanup is blocked"
+            )
+
+        paths: list[Path] = []
+        for worktree in worktrees:
+            if not worktree.is_dir():
+                continue
+            result = self._runner.run(
+                [
+                    "git",
+                    "-C",
+                    str(worktree),
+                    "status",
+                    "--porcelain=v1",
+                    "--untracked-files=all",
+                    "-z",
+                ]
+            )
+            if result.returncode != 0:
+                return CleanupActionPlan(
+                    "untracked", "blocked", target, "Git untracked-file inventory could not be read"
+                )
+            try:
+                paths.extend(self._parse_untracked_status(worktree, result.stdout))
+            except LifecycleError as error:
+                return CleanupActionPlan("untracked", "blocked", target, str(error))
+
+        target = (
+            json.dumps([str(path) for path in sorted(set(paths), key=str)], ensure_ascii=False)
+            if paths
+            else ""
+        )
+        if not paths:
+            return CleanupActionPlan(
+                "untracked", "already_absent", target, "no Git-untracked files are present"
+            )
+        return CleanupActionPlan(
+            "untracked", "delete", target, "listed Git-untracked files are within stored worktrees"
+        )
+
+    def revalidate_untracked_target(self, task_key: TaskKey, target: Path) -> CleanupOutcome:
+        """Revalidate one exact untracked path immediately before deletion."""
+        task = self._state.read_task(task_key)
+        worktrees = self._stored_worktrees(task)
+        records, inventory_error = self._git_worktrees()
+        worktree_action = self._plan_worktrees(worktrees, records, inventory_error)
+        action = self._plan_untracked(worktrees, worktree_action)
+        if action.outcome == "blocked":
+            raise LifecycleError("cleanup untracked target is blocked")
+        if str(target) in _parse_targets(action.target):
+            return "delete"
+        return "already_absent"
+
     def _plan_task_root(
         self,
         root: Path | None,
@@ -387,8 +477,8 @@ class CleanupPlanner:
             "task root is marked, contained, and has no unmanaged worktrees",
         )
 
-    def plan(self, task_key: TaskKey) -> CleanupPlan:
-        """Read and validate the three ordered cleanup targets for one task."""
+    def plan(self, task_key: TaskKey, *, remove_untracked: bool = False) -> CleanupPlan:
+        """Read and validate the ordered cleanup targets for one task."""
         task = self._state.read_task(task_key)
         tab_action = self._plan_tabs(task)
         worktrees = self._stored_worktrees(task)
@@ -396,4 +486,8 @@ class CleanupPlanner:
         worktree_action = self._plan_worktrees(worktrees, records, inventory_error)
         root, root_error = self._candidate_root(task, worktrees)
         root_action = self._plan_task_root(root, root_error, worktrees, records, worktree_action)
-        return CleanupPlan(task_key, root, (tab_action, worktree_action, root_action))
+        actions: tuple[CleanupActionPlan, ...] = (tab_action, worktree_action, root_action)
+        if remove_untracked:
+            untracked_action = self._plan_untracked(worktrees, worktree_action)
+            actions = (tab_action, untracked_action, worktree_action, root_action)
+        return CleanupPlan(task_key, root, actions)

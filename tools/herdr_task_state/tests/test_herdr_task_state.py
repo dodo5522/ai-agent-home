@@ -311,6 +311,24 @@ def test_cleanup_completed_actions_have_deterministic_json_order() -> None:
     assert payload["cleanup"]["completed_actions"] == ["tab", "worktree", "task_root"]
 
 
+def test_cleanup_completed_actions_include_untracked_in_execution_order() -> None:
+    task = Task.parse(
+        "dodo5522/ai-agent-home#33",
+        payload_with_cleanup_action("untracked"),
+    )
+    assert task.cleanup is not None
+    task.cleanup.completed_actions.update({"tab", "worktree", "task_root"})
+
+    payload = json.loads(task.to_json())
+
+    assert payload["cleanup"]["completed_actions"] == [
+        "tab",
+        "untracked",
+        "worktree",
+        "task_root",
+    ]
+
+
 def test_cleanup_completed_targets_are_typed_and_deterministically_serialized() -> None:
     task = Task.parse(
         "dodo5522/ai-agent-home#33",

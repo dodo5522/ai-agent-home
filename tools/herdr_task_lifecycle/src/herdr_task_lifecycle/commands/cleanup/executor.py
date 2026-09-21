@@ -20,9 +20,16 @@ from .planner import (
     CleanupOutcome,
     CleanupPlan,
     CleanupPlanner,
+    _parse_targets,
 )
 
 _ACTION_ORDER: tuple[CleanupActionName, ...] = ("tab", "worktree", "task_root")
+_UNTRACKED_ACTION_ORDER: tuple[CleanupActionName, ...] = (
+    "tab",
+    "untracked",
+    "worktree",
+    "task_root",
+)
 
 
 class _HerdrCleanupOperations(_HerdrPlanningOperations, Protocol):
@@ -97,7 +104,8 @@ class CleanupExecutor:
 
     @staticmethod
     def _validate_plan_shape(plan: CleanupPlan) -> None:
-        if tuple(action.action for action in plan.actions) != _ACTION_ORDER:
+        action_order = tuple(action.action for action in plan.actions)
+        if action_order not in (_ACTION_ORDER, _UNTRACKED_ACTION_ORDER):
             raise LifecycleError("cleanup plan has an invalid action order")
         blocked = [action.action for action in plan.actions if action.outcome == "blocked"]
         if blocked:
@@ -106,7 +114,8 @@ class CleanupExecutor:
     def _revalidate_action(
         self, approved: CleanupPlan, action_name: CleanupActionName
     ) -> CleanupActionPlan:
-        current = self._planner.plan(approved.task_key)
+        remove_untracked = "untracked" in tuple(action.action for action in approved.actions)
+        current = self._planner.plan(approved.task_key, remove_untracked=remove_untracked)
         self._validate_plan_shape(current)
         if current.task_root != approved.task_root:
             raise LifecycleError(f"cleanup {action_name} revalidation changed the task root")
@@ -114,7 +123,12 @@ class CleanupExecutor:
             action for action in approved.actions if action.action == action_name
         )
         current_action = next(action for action in current.actions if action.action == action_name)
-        if current_action.target != approved_action.target:
+        if action_name == "untracked":
+            approved_targets = set(_parse_targets(approved_action.target))
+            current_targets = set(_parse_targets(current_action.target))
+            if not current_targets.issubset(approved_targets):
+                raise LifecycleError("cleanup untracked revalidation changed the target")
+        elif current_action.target != approved_action.target:
             raise LifecycleError(f"cleanup {action_name} revalidation changed the target")
         return current_action
 
@@ -142,9 +156,14 @@ class CleanupExecutor:
                     key=str,
                 )
             )
+        elif action.action == "untracked":
+            targets = _parse_targets(action.target)
         else:
             targets = (str(task_root),)
-        if _display_target(targets) != action.target:
+        if action.action == "untracked":
+            if tuple(targets) != _parse_targets(action.target):
+                raise LifecycleError(f"cleanup {action.action} state changed after revalidation")
+        elif _display_target(targets) != action.target:
             raise LifecycleError(f"cleanup {action.action} state changed after revalidation")
         return targets
 
@@ -160,6 +179,8 @@ class CleanupExecutor:
             return self._planner.revalidate_worktree_target(
                 task_key, Path(target).resolve(strict=False)
             )
+        if action_name == "untracked":
+            return self._planner.revalidate_untracked_target(task_key, Path(target))
         return "delete"
 
     def _perform_target(
@@ -173,6 +194,13 @@ class CleanupExecutor:
             return
         if action_name == "tab":
             self._herdr.tab_close(target)
+        elif action_name == "untracked":
+            path = Path(target)
+            if not path.exists() and not path.is_symlink():
+                return
+            if path.is_dir() and not path.is_symlink():
+                raise LifecycleError("Git-untracked target is a directory")
+            path.unlink()
         elif action_name == "worktree":
             result = self._runner.run(
                 [
@@ -216,6 +244,8 @@ class CleanupExecutor:
             if action.outcome != "already_absent":
                 raise LifecycleError("cleanup task_root completed target is live")
             return
+        if action_name == "untracked" and action.outcome != "already_absent":
+            raise LifecycleError("cleanup untracked completed target is live")
         task = self._state.read_task(plan.task_key)
         for target in self._state_targets(action, task, task_root):
             if self._revalidate_target(plan.task_key, action_name, target) != "already_absent":
@@ -260,9 +290,10 @@ class CleanupExecutor:
             self._progress(task_root, phase, completed, completed_targets),
         )
 
-        current_action: CleanupActionName = "tab"
+        action_order = tuple(action.action for action in plan.actions)
+        current_action: CleanupActionName = action_order[0]
         try:
-            for current_action in _ACTION_ORDER:
+            for current_action in action_order:
                 if current_action in completed:
                     self._verify_completed_action(plan, current_action, task_root)
                     continue
@@ -296,4 +327,4 @@ class CleanupExecutor:
             self._record_failure(plan.task_key, task_root, completed, completed_targets)
             raise LifecycleError(f"cleanup {current_action} failed") from error
 
-        return CleanupResult(plan.task_key, _ACTION_ORDER, mapping_removed=True)
+        return CleanupResult(plan.task_key, action_order, mapping_removed=True)

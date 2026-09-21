@@ -25,3 +25,12 @@ def test_start_help_exposes_issue_and_cwd(capsys: pytest.CaptureFixture[str]) ->
     output = capsys.readouterr().out
     assert "ISSUE_NUMBER" in output
     assert "--cwd" in output
+
+
+def test_cleanup_help_exposes_untracked_file_option(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Cleanup documents the explicit opt-in for deleting untracked files."""
+    assert main(["cleanup", "--help"]) == 0
+    output = capsys.readouterr().out
+    assert "--remove-untracked" in output

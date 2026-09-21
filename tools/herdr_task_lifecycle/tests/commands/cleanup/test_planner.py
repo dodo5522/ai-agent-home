@@ -18,6 +18,7 @@ from herdr_task_lifecycle.runner import CommandResult
 @dataclass
 class RecordingRunner:
     result: CommandResult
+    untracked_output: str = ""
     calls: list[tuple[str, ...]] = field(default_factory=list)
 
     def run(
@@ -27,7 +28,10 @@ class RecordingRunner:
         environment: Mapping[str, str] | None = None,
     ) -> CommandResult:
         del cwd, environment
-        self.calls.append(tuple(arguments))
+        command = tuple(arguments)
+        self.calls.append(command)
+        if len(command) > 3 and command[3] == "status":
+            return CommandResult(0, self.untracked_output, "")
         return self.result
 
 
@@ -174,6 +178,66 @@ def test_plan_only_targets_stored_managed_resources(cleanup_fixture: CleanupFixt
             "--porcelain",
         )
     ]
+
+
+def test_plan_with_remove_untracked_lists_exact_untracked_paths(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    generated_file = cleanup_fixture.worktree / "generated.txt"
+    generated_file.write_text("generated", encoding="utf-8")
+    generated_nested = cleanup_fixture.worktree / "generated" / "preview.png"
+    generated_nested.parent.mkdir()
+    generated_nested.write_bytes(b"preview")
+    cleanup_fixture.runner.untracked_output = "?? generated.txt\0?? generated/preview.png\0"
+
+    plan = cleanup_fixture.planner.plan(cleanup_fixture.task_key, remove_untracked=True)
+
+    assert [item.action for item in plan.actions] == [
+        "tab",
+        "untracked",
+        "worktree",
+        "task_root",
+    ]
+    assert plan.actions[1].outcome == "delete"
+    assert json.loads(plan.actions[1].target) == [
+        str(generated_file),
+        str(generated_nested),
+    ]
+
+
+def test_plan_without_remove_untracked_does_not_scan_untracked_files(
+    cleanup_fixture: CleanupFixture,
+) -> None:
+    cleanup_fixture.runner.untracked_output = "?? generated.txt\0"
+
+    plan = cleanup_fixture.planner.plan(cleanup_fixture.task_key)
+
+    assert [item.action for item in plan.actions] == ["tab", "worktree", "task_root"]
+    assert not any(command[3] == "status" for command in cleanup_fixture.runner.calls)
+
+
+def test_plan_ignores_git_ignored_status_entries(cleanup_fixture: CleanupFixture) -> None:
+    cleanup_fixture.runner.untracked_output = "!! .venv/cache.pyc\0"
+
+    action = cleanup_fixture.planner.plan(
+        cleanup_fixture.task_key,
+        remove_untracked=True,
+    ).actions[1]
+
+    assert action.outcome == "already_absent"
+    assert action.target == ""
+
+
+def test_plan_blocks_unsafe_untracked_path(cleanup_fixture: CleanupFixture) -> None:
+    cleanup_fixture.runner.untracked_output = "?? ../outside.txt\0"
+
+    action = cleanup_fixture.planner.plan(
+        cleanup_fixture.task_key,
+        remove_untracked=True,
+    ).actions[1]
+
+    assert action.outcome == "blocked"
+    assert "unsafe" in action.reason
 
 
 def test_herdr_cleanup_lookup_uses_exact_stored_ids() -> None:

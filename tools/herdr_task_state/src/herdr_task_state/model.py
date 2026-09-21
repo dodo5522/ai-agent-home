@@ -40,8 +40,8 @@ RepositoryName = Annotated[str, StringConstraints(pattern=_REPOSITORY_PATTERN)]
 Slug = Annotated[str, StringConstraints(pattern=_SLUG_PATTERN)]
 PositiveInt = Annotated[StrictInt, Field(gt=0)]
 AbsolutePath = Annotated[NonEmptyString, AfterValidator(_absolute_path)]
-CleanupAction = Literal["tab", "worktree", "task_root"]
-_CLEANUP_ACTIONS: tuple[CleanupAction, ...] = ("tab", "worktree", "task_root")
+CleanupAction = Literal["tab", "untracked", "worktree", "task_root"]
+_CLEANUP_ACTIONS: tuple[CleanupAction, ...] = ("tab", "untracked", "worktree", "task_root")
 
 
 @dataclass(frozen=True)
