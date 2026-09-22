@@ -10,10 +10,10 @@ resume a conversation in another project or task.
 
 ## Scope
 
-This change implements session storage in the existing version 1 document,
-discovery of the exact session ID reported by Herdr, explicit
-`codex resume SESSION_ID` startup, safe fresh-session fallback, stale mapping
-handling, and multi-Agent restart tests.
+This change implements a version 2 state document with session storage, an
+atomic version 1 migration, discovery of the exact session ID reported by
+Herdr, explicit `codex resume SESSION_ID` startup, safe fresh-session fallback,
+stale mapping handling, and multi-Agent restart tests.
 
 It does not add another state file, continuously supervise Agents, create
 worktrees, dispatch coordinator requests, add reviewer Panes, or select models.
@@ -33,15 +33,16 @@ Issue Agents use the existing optional field at
 Their repository, Workspace, worktree, branch, Pane, and Agent bindings already
 exist in surrounding objects and are not duplicated.
 
-Persistent Agents have no Issue task. The document gains an optional top-level
-`persistent_agents` map keyed by exact managed Agent name. Each value contains
+Persistent Agents have no Issue task. Version 2 adds a required top-level
+`persistent_agents` map keyed by exact managed Agent name; the map may be empty.
+Each value contains
 the non-empty `codex_session_id`, normalized `repository`, `workspace_id`,
 `workspace_label`, resolved absolute `worktree`, attached `branch`, and the last
 validated `pane_id`.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "tasks": {
     "dodo5522/ai-agent-home#10": {
       "repository": "dodo5522/ai-agent-home",
@@ -79,11 +80,26 @@ validated `pane_id`.
 }
 ```
 
-The schema stays at version 1. This is an additive optional extension: existing
-field meanings and types do not change, a document without `persistent_agents`
-remains valid, and the existing Issue session field may remain absent. Existing
-files need no migration. Any future incompatible meaning, required field, or
-representation change requires a new version and explicit migration.
+The schema advances to version 2 because `persistent_agents` introduces a new
+managed resource class and document-wide uniqueness rules that version 1 code
+cannot validate. Version 2 requires `persistent_agents`, although it may be an
+empty map. The existing Issue task shape and optional Issue session field keep
+their meanings.
+
+Version 1 remains a supported migration input. Migration validates the complete
+version 1 document, preserves `tasks` and unknown forward-compatible fields,
+adds an empty `persistent_agents` map, changes `version` to `2`, validates the
+result, and atomically replaces the same file under its existing lock. A failed
+migration leaves the original bytes intact. Migrating version 2 is an
+idempotent no-op; other versions are rejected.
+
+Read-only validation accepts versions 1 and 2 without writing. A newly
+initialized state uses version 2. The first mutating operation on valid version
+1 state performs the migration in the same lock scope before applying its
+requested change. This avoids a separate operator migration window while still
+making the schema transition explicit and testable. Once written as version 2,
+the existing version 1 binary rejects the document instead of updating state
+without enforcing the new cross-Agent invariants.
 
 The existing state lock, private permissions, strict parsing, whole-document
 validation, atomic replace, and temporary-file cleanup apply to every session
@@ -205,7 +221,10 @@ cleanup ownership.
 
 Tests prove:
 
-- existing version 1 documents without sessions remain valid without migration;
+- version 1 validation is read-only, and its first mutation migrates atomically
+  to version 2 without changing existing tasks or unknown fields;
+- failed migration preserves the original version 1 bytes, repeated version 2
+  migration is a no-op, and unsupported versions are rejected;
 - persistent mapping validation, private permissions, atomic updates, locking,
   and preservation of unrelated state;
 - duplicate Agent names and session ownership across both locations fail;
@@ -231,7 +250,7 @@ when the installed Herdr/Codex environment supports it.
 
 ## Documentation updates
 
-Update `docs/HERDR-TASK-STATE.md` with the optional persistent Agent map, the
-existing nested Issue session field, uniqueness rules, and session CLI. Update
-`docs/HERDR-TASK-LIFECYCLE.md` with exact-session recovery, fallback, cleanup,
-and operator-visible stale conflict behavior.
+Update `docs/HERDR-TASK-STATE.md` with the version 2 persistent Agent map, v1
+migration, existing nested Issue session field, uniqueness rules, and session
+CLI. Update `docs/HERDR-TASK-LIFECYCLE.md` with exact-session recovery,
+fallback, cleanup, and operator-visible stale conflict behavior.
