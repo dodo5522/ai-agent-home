@@ -44,9 +44,9 @@ def test_lists_named_agents_with_valid_identity() -> None:
             {
                 "agents": [
                     {
-                        "agent": "codex-main",
+                        "agent": "codex",
+                        "name": "codex-main",
                         "agent_status": "working",
-                        "agent_session": {"agent": "codex", "kind": "id"},
                         "pane_id": "w16:p2",
                         "workspace_id": "w16",
                         "cwd": "/work/main",
@@ -73,8 +73,8 @@ def test_finds_agent_by_exact_name() -> None:
             {
                 "agents": [
                     {
-                        "agent": "codex-main",
-                        "agent_session": {"agent": "codex"},
+                        "agent": "codex",
+                        "name": "codex-main",
                         "pane_id": "w16:p2",
                         "workspace_id": "w16",
                         "cwd": "/work/main",
@@ -98,8 +98,8 @@ def test_rejects_agent_identity_mismatch() -> None:
             {
                 "agents": [
                     {
-                        "agent": "",
-                        "agent_session": {"agent": "codex"},
+                        "agent": "codex",
+                        "name": "",
                         "pane_id": "w16:p2",
                         "workspace_id": "w16",
                         "cwd": "/work/main",
@@ -109,8 +109,36 @@ def test_rejects_agent_identity_mismatch() -> None:
         ),
     )
 
-    with pytest.raises(HerdrError, match="agent"):
+    with pytest.raises(HerdrError, match="name"):
         HerdrClient(runner).agent.list()
+
+
+def test_unnamed_live_agents_are_not_managed() -> None:
+    runner = RecordingRunner()
+    runner.respond(
+        ["herdr", "agent", "list"],
+        herdr_result(
+            {
+                "agents": [
+                    {
+                        "agent": "codex",
+                        "pane_id": "w16:p1",
+                        "workspace_id": "w16",
+                        "cwd": "/work/other",
+                    },
+                    {
+                        "agent": "codex",
+                        "name": "codex-main",
+                        "pane_id": "w16:p2",
+                        "workspace_id": "w16",
+                        "cwd": "/work/main",
+                    },
+                ]
+            }
+        ),
+    )
+
+    assert [agent.name for agent in HerdrClient(runner).agent.list()] == ["codex-main"]
 
 
 def test_lists_panes_with_cwd_and_workspace_identity() -> None:
@@ -145,8 +173,8 @@ def test_starts_agent_on_explicit_pane_and_validates_result() -> None:
         herdr_result(
             {
                 "agent": {
-                    "agent": "codex-main",
-                    "agent_session": {"agent": "codex"},
+                    "agent": "codex",
+                    "name": "codex-main",
                     "pane_id": "w16:p2",
                     "workspace_id": "w16",
                     "cwd": "/work/main",

@@ -64,8 +64,8 @@ def test_agent_start_targets_explicit_pane() -> None:
             command: result(
                 {
                     "agent": {
-                        "agent": "codex-main",
-                        "agent_session": {"agent": "codex"},
+                        "agent": "codex",
+                        "name": "codex-main",
                         "pane_id": "w16:p2",
                         "workspace_id": "w16",
                         "cwd": "/work/main",

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .._decoding import JsonObject, required_object, required_string
+from .._decoding import JsonObject, optional_string, required_object, required_string
 from ..errors import HerdrError
 from ..models import AgentInfo
 from ..transport import HerdrTransport
@@ -14,13 +14,9 @@ class AgentClient:
 
     @staticmethod
     def _info(agent: JsonObject) -> AgentInfo:
-        session = agent.get("agent_session")
-        kind = "codex"
-        if isinstance(session, dict) and isinstance(session.get("agent"), str):
-            kind = required_string(session, "agent")
         return AgentInfo(
-            name=required_string(agent, "agent"),
-            kind=kind,
+            name=required_string(agent, "name"),
+            kind=required_string(agent, "agent"),
             pane_id=required_string(agent, "pane_id"),
             workspace_id=required_string(agent, "workspace_id"),
             cwd=Path(required_string(agent, "cwd")),
@@ -34,6 +30,8 @@ class AgentClient:
         for raw_item in raw_items:
             if not isinstance(raw_item, dict):
                 raise HerdrError("Herdr Agent response contains an invalid Agent")
+            if optional_string(raw_item, "name") is None:
+                continue
             items.append(self._info(raw_item))
         return items
 
