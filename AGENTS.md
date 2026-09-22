@@ -50,9 +50,11 @@ and exact cleanup procedure are in
 [`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md). Keep the Tab,
 worktree, task root, and state mapping while a Pull Request is open or under
 review. For non-PR work, wait for explicit user completion confirmation.
-Always show a fresh `herdr-task cleanup ISSUE --plan`, obtain human approval,
-and use the plan's exact task root for guarded execution. Never clean up
-unmanaged or another task's resources.
+Always show a fresh `herdr-task cleanup ISSUE --plan --remove-untracked` so
+Git-untracked, non-ignored paths are included in the approval scope. Obtain
+human approval, then repeat `--remove-untracked` and use the plan's exact task
+root for guarded execution. Never clean up unmanaged or another task's
+resources.
 
 ## Commit policy
 
