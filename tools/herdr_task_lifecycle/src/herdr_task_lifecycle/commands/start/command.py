@@ -30,7 +30,7 @@ def _run(args: argparse.Namespace) -> int:
         state_path(),
         runner=runner,
         herdr=herdr,
-        agent_starter=TaskAgentStarter(AgentManager(herdr)),
+        agent_starter=TaskAgentStarter(AgentManager(herdr.agent)),
     ).start(args.issue_number, cwd)
     print(resolution.task.to_json())
     return ExitCode.SUCCESS

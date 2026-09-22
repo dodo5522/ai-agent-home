@@ -14,16 +14,14 @@ class FakeHerdr:
     prompts: list[tuple[str, str]] = field(default_factory=list)
     started_override: AgentInfo | None = None
 
-    def agents(self) -> list[AgentInfo]:
-        return list(self.live)
+    def find(self, name: str) -> AgentInfo | None:
+        return next((agent for agent in self.live if agent.name == name), None)
 
-    def agent_start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
+    def start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
         self.starts.append((name, pane_id, kind))
-        return self.started_override or AgentInfo(
-            name, kind, pane_id, "w16", Path("/work/issue-9")
-        )
+        return self.started_override or AgentInfo(name, kind, pane_id, "w16", Path("/work/issue-9"))
 
-    def agent_prompt(self, name: str, text: str) -> None:
+    def prompt(self, name: str, text: str) -> None:
         self.prompts.append((name, text))
 
 
@@ -60,18 +58,14 @@ def test_exact_live_agent_is_reused() -> None:
         (AgentInfo("codex-issue-9", "codex", "w16:p2", "w16", Path("/work/other")), "cwd"),
     ],
 )
-def test_live_agent_with_wrong_identity_is_rejected(
-    existing: AgentInfo, message: str
-) -> None:
+def test_live_agent_with_wrong_identity_is_rejected(existing: AgentInfo, message: str) -> None:
     with pytest.raises(AgentManagementError, match=message):
         AgentManager(FakeHerdr(live=[existing])).ensure(target())
 
 
 def test_started_agent_with_wrong_identity_is_rejected() -> None:
     herdr = FakeHerdr(
-        started_override=AgentInfo(
-            "codex-issue-9", "codex", "w16:p9", "w16", Path("/work/issue-9")
-        )
+        started_override=AgentInfo("codex-issue-9", "codex", "w16:p9", "w16", Path("/work/issue-9"))
     )
 
     with pytest.raises(AgentManagementError, match="pane"):

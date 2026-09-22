@@ -33,7 +33,7 @@ def test_invalid_json_is_a_typed_herdr_error() -> None:
     runner = RecordingRunner({("herdr", "workspace", "list"): CommandResult(0, "bad", "")})
 
     with pytest.raises(HerdrError, match="invalid JSON"):
-        HerdrClient(runner).workspaces()
+        HerdrClient(runner).workspace.list()
 
 
 def test_workspace_list_preserves_identity() -> None:
@@ -45,7 +45,7 @@ def test_workspace_list_preserves_identity() -> None:
         }
     )
 
-    assert HerdrClient(runner).workspaces()[0].workspace_id == "w16"
+    assert HerdrClient(runner).workspace.list()[0].workspace_id == "w16"
 
 
 def test_agent_start_targets_explicit_pane() -> None:
@@ -75,7 +75,7 @@ def test_agent_start_targets_explicit_pane() -> None:
         }
     )
 
-    started = HerdrClient(runner).agent_start("codex-main", "w16:p2")
+    started = HerdrClient(runner).agent.start("codex-main", "w16:p2")
 
     assert started.name == "codex-main"
     assert runner.calls == [command]
@@ -85,6 +85,6 @@ def test_agent_prompt_targets_exact_name() -> None:
     command = ("herdr", "agent", "prompt", "codex-main", "start issue 9")
     runner = RecordingRunner({command: result({})})
 
-    HerdrClient(runner).agent_prompt("codex-main", "start issue 9")
+    HerdrClient(runner).agent.prompt("codex-main", "start issue 9")
 
     assert runner.calls == [command]

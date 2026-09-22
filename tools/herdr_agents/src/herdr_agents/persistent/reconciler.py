@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from herdr_runtime import AgentInfo, HerdrRuntimeError, PaneInfo
 
 from ..errors import AgentManagementError
-from ..service import AgentManager, AgentTarget
+from ..service import AgentManager, AgentOperations, AgentTarget
 from .config import AgentDefinition
 
 
@@ -25,9 +25,11 @@ class AgentReconciler:
     def __init__(
         self,
         manager: AgentManager,
+        agents: AgentOperations,
         pane_resolver: Callable[[AgentDefinition, AgentInfo | None], PaneInfo],
     ) -> None:
         self._manager = manager
+        self._agents = agents
         self._pane_resolver = pane_resolver
 
     def reconcile(self, definitions: Sequence[AgentDefinition]) -> AgentReconcileResult:
@@ -37,7 +39,7 @@ class AgentReconciler:
         failed: list[tuple[str, str]] = []
         for definition in definitions:
             try:
-                existing = self._manager.find(definition.name)
+                existing = self._agents.find(definition.name)
                 pane = self._pane_resolver(definition, existing)
                 if pane.workspace_id is None:
                     raise AgentManagementError(

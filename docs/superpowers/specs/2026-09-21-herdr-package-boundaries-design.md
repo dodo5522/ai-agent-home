@@ -71,11 +71,14 @@ multi-Agent reconciliation. Lifecycle owns deterministic task names, the
 implementer role, initial Issue instructions, and persistence in task state.
 
 Move the existing adapter's task-specific Workspace/Tab operation Protocols
-into lifecycle; keep generic resource dataclasses and CLI serialization in the
-runtime. Agent operation Protocols and the generic service belong to
-herdr_agents. Use concrete JSON boundary types (Any/cast only at decoding
-boundaries) instead of
-spreading object-valued mappings into application APIs.
+into lifecycle. In the runtime, keep generic resource dataclasses and expose
+focused clients through `HerdrClient.workspace`, `.tab`, `.pane`, and `.agent`;
+the facade itself only composes those clients over a shared JSON transport.
+Agent lookup belongs to the Agent client rather than the `AgentInfo` value or
+the policy-level `AgentManager`. Agent operation Protocols and the generic
+service belong to herdr_agents. Use concrete JSON boundary types (Any/cast only
+at decoding boundaries) instead of spreading object-valued mappings into
+application APIs.
 
 ## Commands, packaging and errors
 
@@ -116,9 +119,9 @@ failure isolation, retry and rollback handling, and isolated installation of
 both CLI projects. Run pytest and Ruff for affected projects, shell bootstrap
 and documentation checks, and command help smoke tests without starting live
 Agents. Check that herdr_agents can import/run without lifecycle/task-state
-installed, and that lifecycle invokes the generic Agent service rather than
-HerdrClient Agent methods directly. Update operator docs with the actual final
-module map.
+installed, and that lifecycle invokes the generic Agent service with the
+focused runtime Agent client. Update operator docs with the actual final module
+map.
 
 The existing lifecycle documentation test rejects any local agents.toml file;
 adjust that check to verify Git exclusion rather than file absence, because a

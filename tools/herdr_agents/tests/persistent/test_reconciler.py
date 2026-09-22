@@ -18,10 +18,10 @@ class FakeHerdr:
     failing: set[str] = field(default_factory=set)
     starts: list[str] = field(default_factory=list)
 
-    def agents(self) -> list[AgentInfo]:
-        return list(self.live)
+    def find(self, name: str) -> AgentInfo | None:
+        return next((agent for agent in self.live if agent.name == name), None)
 
-    def agent_start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
+    def start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
         self.starts.append(name)
         if name in self.failing:
             raise HerdrError(f"start failed for {name}")
@@ -30,7 +30,7 @@ class FakeHerdr:
         self.live.append(agent)
         return agent
 
-    def agent_prompt(self, name: str, text: str) -> None:
+    def prompt(self, name: str, text: str) -> None:
         raise AssertionError("persistent reconcile does not prompt")
 
 
@@ -42,7 +42,7 @@ def resolve(definition: AgentDefinition, existing: AgentInfo | None) -> PaneInfo
 
 def test_starts_missing_definitions_and_then_skips_live_agents() -> None:
     herdr = FakeHerdr()
-    reconciler = AgentReconciler(AgentManager(herdr), resolve)
+    reconciler = AgentReconciler(AgentManager(herdr), herdr, resolve)
     definitions = [
         definition("codex-main", "/work/main"),
         definition("codex-review", "/work/review"),
@@ -59,7 +59,7 @@ def test_starts_missing_definitions_and_then_skips_live_agents() -> None:
 def test_failed_definition_does_not_prevent_later_start() -> None:
     herdr = FakeHerdr(failing={"codex-main"})
 
-    result = AgentReconciler(AgentManager(herdr), resolve).reconcile(
+    result = AgentReconciler(AgentManager(herdr), herdr, resolve).reconcile(
         [definition("codex-main", "/work/main"), definition("codex-review", "/work/review")]
     )
 

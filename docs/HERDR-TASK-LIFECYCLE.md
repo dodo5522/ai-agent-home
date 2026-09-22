@@ -73,8 +73,10 @@ dispatch, then implement role Pane/reviewer integration and validate two
 simultaneous Issues end to end. Acceptance must demonstrate distinct worker
 names, Panes, task mappings and contexts; concurrent reviews; result delivery;
 and approved cleanup of one Issue without affecting the other or the
-coordinator. Package/CLI responsibility boundaries discussed during #9 remain
-to be decided; this operational agreement does not implement that refactor.
+coordinator. Package boundaries are implemented on this branch: lifecycle owns
+Issue policy, `herdr_agents` owns generic Agent management and persistent
+reconciliation, and `herdr_runtime` exposes focused Workspace, Tab, Pane, and
+Agent clients over the shared Herdr transport.
 
 ## Task identity
 

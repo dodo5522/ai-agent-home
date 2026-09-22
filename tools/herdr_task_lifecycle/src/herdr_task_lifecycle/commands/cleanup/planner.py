@@ -136,10 +136,10 @@ class CleanupPlanner:
             return CleanupActionPlan("tab", "blocked", target, "stored workspace label is required")
 
         try:
-            workspace = self._herdr.workspace_find(task.herdr.workspace_id)
+            workspace = self._herdr.workspace.find(task.herdr.workspace_id)
             if workspace is None:
                 for tab_id, _ in self._stored_tabs(task):
-                    if self._herdr.tab_find(tab_id) is not None:
+                    if self._herdr.tab.find(tab_id) is not None:
                         return CleanupActionPlan(
                             "tab",
                             "blocked",
@@ -159,7 +159,7 @@ class CleanupPlanner:
 
             live_count = 0
             for tab_id, tab_label in self._stored_tabs(task):
-                tab = self._herdr.tab_find(tab_id)
+                tab = self._herdr.tab.find(tab_id)
                 if tab is None:
                     continue
                 live_count += 1

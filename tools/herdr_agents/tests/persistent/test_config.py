@@ -29,9 +29,7 @@ def test_loads_two_agent_definitions_in_name_order(tmp_path: Path) -> None:
     )
 
     assert load_agent_definitions(path) == (
-        AgentDefinition(
-            "codex-main", "implementer", "dodo5522/ai-agent-home", Path("/work/main")
-        ),
+        AgentDefinition("codex-main", "implementer", "dodo5522/ai-agent-home", Path("/work/main")),
         AgentDefinition(
             "codex-reviewer", "reviewer", "dodo5522/ai-agent-home", Path("/work/review")
         ),

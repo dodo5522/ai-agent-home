@@ -12,9 +12,9 @@ from .errors import AgentManagementError
 class AgentOperations(Protocol):
     """Low-level Herdr operations required by AgentManager."""
 
-    def agents(self) -> list[AgentInfo]: ...
-    def agent_start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo: ...
-    def agent_prompt(self, name: str, text: str) -> None: ...
+    def find(self, name: str) -> AgentInfo | None: ...
+    def start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo: ...
+    def prompt(self, name: str, text: str) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -52,20 +52,16 @@ class AgentManager:
         if agent.cwd != target.cwd:
             raise AgentManagementError(f"Agent {target.name} has a different cwd")
 
-    def find(self, name: str) -> AgentInfo | None:
-        """Return one live Agent by exact managed name."""
-        return next((agent for agent in self._herdr.agents() if agent.name == name), None)
-
     def ensure(self, target: AgentTarget) -> EnsuredAgent:
         """Return the exact live Agent, starting it when absent."""
-        existing = self.find(target.name)
+        existing = self._herdr.find(target.name)
         if existing is not None:
             self._validate(existing, target)
             return EnsuredAgent(existing, started=False)
-        started = self._herdr.agent_start(target.name, target.pane_id)
+        started = self._herdr.start(target.name, target.pane_id)
         self._validate(started, target)
         return EnsuredAgent(started, started=True)
 
     def prompt(self, name: str, text: str) -> None:
         """Send text to one exact managed Agent name."""
-        self._herdr.agent_prompt(name, text)
+        self._herdr.prompt(name, text)

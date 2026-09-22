@@ -12,30 +12,46 @@ from herdr_agents.persistent.resolver import resolve_pane
 
 
 @dataclass
+class FakeWorkspaceClient:
+    owner: FakeHerdr
+
+    def list(self) -> list[WorkspaceInfo]:
+        return list(self.owner.workspace_values)
+
+
+@dataclass
+class FakePaneClient:
+    owner: FakeHerdr
+
+    def list(self, workspace_id: str) -> list[PaneInfo]:
+        return [pane for pane in self.owner.pane_values if pane.workspace_id == workspace_id]
+
+
+@dataclass
 class FakeHerdr:
     live: list[AgentInfo] = field(default_factory=list)
     starts: list[str] = field(default_factory=list)
     workspace_values: list[WorkspaceInfo] = field(default_factory=list)
     pane_values: list[PaneInfo] = field(default_factory=list)
+    workspace: FakeWorkspaceClient = field(init=False)
+    pane: FakePaneClient = field(init=False)
 
-    def agents(self) -> list[AgentInfo]:
-        return list(self.live)
+    def __post_init__(self) -> None:
+        self.workspace = FakeWorkspaceClient(self)
+        self.pane = FakePaneClient(self)
 
-    def agent_start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
+    def find(self, name: str) -> AgentInfo | None:
+        return next((agent for agent in self.live if agent.name == name), None)
+
+    def start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
         self.starts.append(name)
         cwd = Path("/work/main" if name == "codex-main" else "/work/review")
         agent = AgentInfo(name, kind, pane_id, "w1", cwd)
         self.live.append(agent)
         return agent
 
-    def agent_prompt(self, name: str, text: str) -> None:
+    def prompt(self, name: str, text: str) -> None:
         raise AssertionError("persistent reconcile does not prompt")
-
-    def workspaces(self) -> list[WorkspaceInfo]:
-        return list(self.workspace_values)
-
-    def panes(self, workspace_id: str) -> list[PaneInfo]:
-        return [pane for pane in self.pane_values if pane.workspace_id == workspace_id]
 
 
 def write_config(tmp_path: Path) -> Path:
@@ -68,8 +84,8 @@ def test_reconcile_loads_config_and_is_idempotent(tmp_path: Path) -> None:
     manager = AgentManager(herdr)
     config = write_config(tmp_path)
 
-    first = reconcile(config, manager, resolve)
-    second = reconcile(config, manager, resolve)
+    first = reconcile(config, manager, herdr, resolve)
+    second = reconcile(config, manager, herdr, resolve)
 
     assert first == AgentReconcileResult(("codex-main", "codex-review"), (), ())
     assert second == AgentReconcileResult((), ("codex-main", "codex-review"), ())
@@ -81,7 +97,7 @@ def test_malformed_config_performs_no_agent_mutation(tmp_path: Path) -> None:
     herdr = FakeHerdr()
 
     with pytest.raises(AgentManagementError, match="invalid TOML"):
-        reconcile(config, AgentManager(herdr), resolve)
+        reconcile(config, AgentManager(herdr), herdr, resolve)
 
     assert herdr.starts == []
 
@@ -108,6 +124,7 @@ def test_live_configured_agent_is_skipped_before_resolving_an_available_pane(
     result = reconcile(
         config,
         AgentManager(herdr),
+        herdr,
         lambda item, existing: resolve_pane(
             item,
             herdr,

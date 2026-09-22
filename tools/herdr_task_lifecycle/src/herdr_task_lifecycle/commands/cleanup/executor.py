@@ -35,8 +35,7 @@ _UNTRACKED_ACTION_ORDER: tuple[CleanupActionName, ...] = (
 class _HerdrCleanupOperations(HerdrPlanningOperations, Protocol):
     """Herdr operations needed to validate and execute Tab cleanup."""
 
-    def tab_close(self, tab_id: str) -> None:
-        """Close one exact validated Tab ID."""
+    """Herdr operations needed to validate and execute Tab cleanup."""
 
 
 @dataclass(frozen=True)
@@ -193,7 +192,7 @@ class CleanupExecutor:
         if self._revalidate_target(task_key, action_name, target) == "already_absent":
             return
         if action_name == "tab":
-            self._herdr.tab_close(target)
+            self._herdr.tab.close(target)
         elif action_name == "untracked":
             path = Path(target)
             if not path.exists() and not path.is_symlink():

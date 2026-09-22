@@ -56,13 +56,38 @@ def test_lists_named_agents_with_valid_identity() -> None:
         ),
     )
 
-    agents = HerdrClient(runner).agents()
+    agents = HerdrClient(runner).agent.list()
 
     assert agents[0].name == "codex-main"
     assert agents[0].kind == "codex"
     assert agents[0].pane_id == "w16:p2"
     assert agents[0].workspace_id == "w16"
     assert agents[0].cwd == Path("/work/main")
+
+
+def test_finds_agent_by_exact_name() -> None:
+    runner = RecordingRunner()
+    runner.respond(
+        ["herdr", "agent", "list"],
+        herdr_result(
+            {
+                "agents": [
+                    {
+                        "agent": "codex-main",
+                        "agent_session": {"agent": "codex"},
+                        "pane_id": "w16:p2",
+                        "workspace_id": "w16",
+                        "cwd": "/work/main",
+                    }
+                ]
+            }
+        ),
+    )
+
+    client = HerdrClient(runner).agent
+
+    assert client.find("codex-main") is not None
+    assert client.find("missing") is None
 
 
 def test_rejects_agent_identity_mismatch() -> None:
@@ -85,7 +110,7 @@ def test_rejects_agent_identity_mismatch() -> None:
     )
 
     with pytest.raises(HerdrError, match="agent"):
-        HerdrClient(runner).agents()
+        HerdrClient(runner).agent.list()
 
 
 def test_lists_panes_with_cwd_and_workspace_identity() -> None:
@@ -106,7 +131,7 @@ def test_lists_panes_with_cwd_and_workspace_identity() -> None:
         ),
     )
 
-    panes = HerdrClient(runner).panes("w16")
+    panes = HerdrClient(runner).pane.list("w16")
 
     assert panes[0].pane_id == "w16:p2"
     assert panes[0].workspace_id == "w16"
@@ -130,7 +155,7 @@ def test_starts_agent_on_explicit_pane_and_validates_result() -> None:
         ),
     )
 
-    started = HerdrClient(runner).agent_start("codex-main", "w16:p2")
+    started = HerdrClient(runner).agent.start("codex-main", "w16:p2")
 
     assert started.name == "codex-main"
     assert runner.calls == [
@@ -145,6 +170,6 @@ def test_prompts_exact_agent_name_without_focus_targeting() -> None:
         herdr_result({}),
     )
 
-    HerdrClient(runner).agent_prompt("codex-main", "start issue 9")
+    HerdrClient(runner).agent.prompt("codex-main", "start issue 9")
 
     assert runner.calls == [("herdr", "agent", "prompt", "codex-main", "start issue 9")]
