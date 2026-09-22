@@ -10,7 +10,11 @@ rg -Uq 'repository-wide managed resource shared by tasks in the same[[:space:]]+
     docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'does not bind execution to the previously displayed plan' \
     docs/HERDR-TASK-LIFECYCLE.md
-rg -q 'herdr-task cleanup ISSUE --plan' AGENTS.md
+rg -q 'herdr-task cleanup ISSUE --plan --remove-untracked' AGENTS.md
+rg -q 'herdr-task cleanup 32 --plan --remove-untracked' docs/HERDR-TASK-LIFECYCLE.md
+rg -q 'herdr-task cleanup ISSUE --plan --remove-untracked' docs/HERDR-TASK-LIFECYCLE.md
+rg -q 'cleanup ISSUE --execute --remove-untracked --confirm-task-root' \
+    docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'non-primary Git worktree' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'worktree.*branch' docs/HERDR-TASK-LIFECYCLE.md
 rg -q '#<issue-number> <short-title>' docs/HERDR-TASK-LIFECYCLE.md

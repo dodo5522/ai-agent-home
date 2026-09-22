@@ -225,25 +225,18 @@ Cleanup is always a plan, human approval, then execution process. From the
 task repository, first create a read-only plan:
 
 ```bash
-bin/herdr-task cleanup 32 --plan
-```
-
-The JSON response contains `task_key`, the resolved `task_root`, and ordered
-`tab`, `worktree`, and `task_root` actions. Planning does not create, close,
-rename, remove, or write any resource.
-
-The default plan does not inspect or delete Git-untracked files. When a task
-worktree contains generated files that should be discarded, opt in explicitly
-and review the additional `untracked` action and its exact path list:
-
-```bash
 bin/herdr-task cleanup 32 --plan --remove-untracked
 ```
 
-The option includes only Git-untracked, non-ignored paths inside the
-state-recorded worktrees. It does not include tracked modifications or ignored
-files. The guarded execution must repeat the option so the approved plan and
-execution have the same action set:
+The JSON response contains `task_key`, the resolved `task_root`, and ordered
+`tab`, `untracked`, `worktree`, and `task_root` actions. Planning does not
+create, close, rename, remove, or write any resource. Always use
+`--remove-untracked` when planning so Git-untracked, non-ignored paths inside
+the state-recorded worktrees are listed in the approval scope from the start.
+The option does not include tracked modifications or ignored files. Listing an
+untracked path does not authorize deletion by itself: show every path to the
+human and obtain approval for the complete plan. The guarded execution must
+repeat the option so the approved plan and execution have the same action set:
 
 ```bash
 bin/herdr-task cleanup 32 --execute --remove-untracked \
@@ -274,7 +267,7 @@ release.
 Only after approval, copy the exact `task_root` value into the guarded command:
 
 ```bash
-bin/herdr-task cleanup 32 --execute \
+bin/herdr-task cleanup 32 --execute --remove-untracked \
   --confirm-task-root /home/takashi/work/tasks/issue-32-example
 ```
 
@@ -287,8 +280,7 @@ Execution proceeds in this order:
 
 1. Close each validated managed Issue Tab. Closing its Tab owns Pane cleanup;
    the repository Workspace remains open.
-2. When `--remove-untracked` is enabled, remove each exact listed untracked
-   path after revalidation.
+2. Remove each exact approved untracked path after revalidation.
 3. Remove each validated registered non-primary Issue worktree through Git.
 4. Recursively remove the single approved task root only when it is strictly
    below `/home/takashi/work/tasks/`, has a direct regular
@@ -305,13 +297,13 @@ already-absent target. If an action fails, the task mapping remains with
 
 1. Inspect the failure and correct only the reported blocker or stale external
    condition.
-2. Run `bin/herdr-task cleanup ISSUE --plan` again, repeating
-   `--remove-untracked` when it was used. The new plan revalidates live state
-   and lists the remaining work.
+2. Run `bin/herdr-task cleanup ISSUE --plan --remove-untracked` again. The new
+   plan revalidates live state and lists the remaining work, including every
+   remaining Git-untracked, non-ignored path.
 3. Show the new complete plan to the human and obtain fresh approval.
-4. Re-run `--execute --confirm-task-root EXACT_PATH`, repeating
-   `--remove-untracked` when it was used. Completed targets are
-   verified as absent and are not deleted twice.
+4. Re-run
+   `bin/herdr-task cleanup ISSUE --execute --remove-untracked --confirm-task-root EXACT_PATH`.
+   Completed targets are verified as absent and are not deleted twice.
 
 Repeat this sequence after every partial failure. Never skip the new plan or
 reuse approval when its targets or resolved root have changed.

@@ -358,7 +358,7 @@ test_herdr_task_lifecycle_contract_is_installed_and_documented() {
     assert_contains "$documentation" '--confirm-task-root' \
         "task lifecycle reference documents exact root confirmation"
     assert_contains "$documentation" '--remove-untracked' \
-        "task lifecycle reference documents opt-in untracked cleanup"
+        "task lifecycle reference documents required untracked cleanup planning"
 }
 
 test_dry_run_lists_every_install_phase
