@@ -5,8 +5,9 @@ import os
 import re
 from pathlib import Path
 
+from herdr_runtime import CommandRunner
+
 from .errors import LifecycleError
-from .runner import CommandRunner
 
 _GITHUB_REMOTE_RE = re.compile(
     r"^(?:https://github\.com/|git@github\.com:)([A-Za-z0-9][A-Za-z0-9._-]*)/"

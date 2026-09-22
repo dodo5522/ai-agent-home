@@ -1,1 +1,7 @@
 /.config/google-drive/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+**/.venv/
+**/build/
+.config/herdr/agents.toml

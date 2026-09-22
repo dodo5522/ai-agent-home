@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Manage the Herdr task lifecycle"
 requires-python = ">=3.14"
 dependencies = [
+    "herdr-agents",
+    "herdr-runtime",
     "herdr-task-state",
 ]
 
@@ -21,6 +23,8 @@ dev = [
 ]
 
 [tool.uv.sources]
+herdr-agents = { path = "../herdr_agents" }
+herdr-runtime = { path = "../herdr_runtime" }
 herdr-task-state = { path = "../herdr_task_state" }
 
 [tool.setuptools]

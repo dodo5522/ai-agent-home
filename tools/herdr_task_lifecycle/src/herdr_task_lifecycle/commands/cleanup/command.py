@@ -3,11 +3,11 @@
 import argparse
 from pathlib import Path
 
+from herdr_runtime import SubprocessRunner
 from herdr_task_state.model import TaskKey
 
 from ...errors import ExitCode, LifecycleError
 from ...identity import resolve_repository
-from ...runner import SubprocessRunner
 from ...state import state_path
 from .executor import CleanupExecutor
 from .planner import CleanupPlanner

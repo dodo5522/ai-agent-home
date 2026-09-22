@@ -14,6 +14,9 @@ HERDR_TASK_STATE_DOC="$REPO_ROOT/docs/HERDR-TASK-STATE.md"
 HERDR_TASK_CLI="$REPO_ROOT/bin/herdr-task"
 HERDR_TASK_PROJECT="$REPO_ROOT/tools/herdr_task_lifecycle/pyproject.toml"
 HERDR_TASK_DOC="$REPO_ROOT/docs/HERDR-TASK-LIFECYCLE.md"
+HERDR_AGENTS_CLI="$REPO_ROOT/bin/herdr-agents"
+HERDR_AGENTS_PROJECT="$REPO_ROOT/tools/herdr_agents/pyproject.toml"
+HERDR_RUNTIME_PROJECT="$REPO_ROOT/tools/herdr_runtime/pyproject.toml"
 failures=0
 
 fail() {
@@ -121,6 +124,29 @@ test_runtime_paths_use_mise_shims() {
         "$bootstrap" \
         '/home/takashi/.local/share/mise/shims/herdr' \
         "Herdr bootstrap uses the mise shim"
+}
+
+test_herdr_agent_bootstrap_reconciles_named_agents() {
+    local bootstrap agent_wrapper
+    bootstrap=$(cat "$REPO_ROOT/bin/start-herdr-agents.sh")
+    agent_wrapper=$(cat "$HERDR_AGENTS_CLI")
+
+    assert_contains "$bootstrap" 'herdr-agents" reconcile' \
+        "Herdr bootstrap delegates to named-Agent reconciliation"
+    assert_contains "$bootstrap" 'HERDR_AGENT_CONFIG' \
+        "Herdr bootstrap passes the Agent configuration path"
+    assert_contains "$agent_wrapper" 'tools/herdr_agents' \
+        "Herdr Agent wrapper uses the independent Agent project"
+    if [[ -x $HERDR_AGENTS_CLI && -f $HERDR_AGENTS_PROJECT && -f $HERDR_RUNTIME_PROJECT ]]; then
+        pass "Herdr Agent and runtime package boundaries are installed"
+    else
+        fail "Herdr Agent and runtime package boundaries are installed"
+    fi
+    if [[ $bootstrap == *'select(.agent == "codex")'* ]]; then
+        fail "Herdr bootstrap does not use the global bare-codex guard"
+    else
+        pass "Herdr bootstrap does not use the global bare-codex guard"
+    fi
 }
 
 test_herdr_skill_is_installed_with_safety_contract() {
@@ -340,6 +366,7 @@ test_blender_batch_installation
 test_help_documents_non_mutating_mode
 test_unknown_option_fails
 test_runtime_paths_use_mise_shims
+test_herdr_agent_bootstrap_reconciles_named_agents
 test_herdr_skill_is_installed_with_safety_contract
 test_herdr_skill_records_reproducible_upstream
 test_herdr_skill_setup_and_update_are_documented

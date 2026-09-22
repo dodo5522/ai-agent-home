@@ -125,6 +125,41 @@ cleanup規則は上記のライフサイクル文書を参照してください�
 bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 ```
 
+目指す運用は、リポジトリごとの常設受付AgentからIssue専用のimplementer／reviewerへ
+委譲する形です。自動振り分け・reviewer追加・結果回収は実装途中です。
+実装済み機能と残件は[引き継ぎ表](docs/HERDR-TASK-LIFECYCLE.md#target-operation-and-implementation-handoff)
+を参照してください。常設Agentを複数Issueの共有ワーカーとしては扱いません。
+
+長期 Agent の定義は、まず `.config/herdr/agents.toml.example` を
+`.config/herdr/agents.toml` にコピーしてから、ローカル環境に合わせて設定します。
+実設定は `cwd` が環境依存のためGit管理外です。Agentは名前単位で冪等に
+reconcile されます。
+
+```bash
+cp .config/herdr/agents.toml.example .config/herdr/agents.toml
+```
+
+```bash
+herdr-agents reconcile --config .config/herdr/agents.toml
+```
+
+`herdr-task start` は Issue の root Pane に implementer Agent を起動・再利用します。
+Agent の session 復元は #10、モデル選択と複雑度ベースの routing は #44 の責務です。
+
+実装は責務ごとに分離されています。
+
+```text
+herdr_task_lifecycle ──> herdr_agents ──> herdr_runtime
+         │                                  ▲
+         ├──────────────────────────────────┘
+         └──────────────> herdr_task_state
+```
+
+`herdr_agents` は名前指定の検索・起動・配置検証・promptを提供する共通機能です。
+Issue用Agentがこれを利用しても常設にはなりません。`agents.toml`を読み込む
+`herdr-agents reconcile`だけが、systemd bootstrapで復旧する常設coordinatorを
+管理します。
+
 ## インストール確認
 
 ```bash

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import CommandResult, TabInfo, WorkspaceInfo
 from herdr_task_state.model import (
     CleanupProgress,
     HerdrReference,
@@ -23,9 +24,26 @@ from herdr_task_lifecycle.commands.cleanup.planner import (
     CleanupPlanner,
 )
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import TabInfo, WorkspaceInfo
-from herdr_task_lifecycle.runner import CommandResult
 from herdr_task_lifecycle.state import TaskStateRepository
+
+
+@dataclass
+class FakeWorkspaceClient:
+    owner: FakeCleanupHerdr
+
+    def find(self, workspace_id: str) -> WorkspaceInfo | None:
+        return self.owner.workspace_find(workspace_id)
+
+
+@dataclass
+class FakeTabClient:
+    owner: FakeCleanupHerdr
+
+    def find(self, tab_id: str) -> TabInfo | None:
+        return self.owner.tab_find(tab_id)
+
+    def close(self, tab_id: str) -> None:
+        self.owner.tab_close(tab_id)
 
 
 @dataclass
@@ -36,6 +54,12 @@ class FakeCleanupHerdr:
     failure: str | None = None
     fail_tab_id: str | None = None
     close_calls: list[str] = field(default_factory=list)
+    workspace: FakeWorkspaceClient = field(init=False)
+    tab: FakeTabClient = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.workspace = FakeWorkspaceClient(self)
+        self.tab = FakeTabClient(self)
 
     def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
         return self.workspaces.get(workspace_id)

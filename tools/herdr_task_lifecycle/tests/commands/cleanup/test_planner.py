@@ -5,14 +5,13 @@ from dataclasses import FrozenInstanceError, dataclass, field
 from pathlib import Path
 
 import pytest
+from herdr_runtime import CommandResult, HerdrClient, TabInfo, WorkspaceInfo
 from herdr_task_state.model import HerdrReference, Task, TaskKey, Workstream
 from herdr_task_state.store import StateStore
 
 from herdr_task_lifecycle.cli import main as lifecycle_main
 from herdr_task_lifecycle.commands.cleanup.planner import CleanupPlanner
 from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import HerdrClient, TabInfo, WorkspaceInfo
-from herdr_task_lifecycle.runner import CommandResult
 
 
 @dataclass
@@ -36,11 +35,33 @@ class RecordingRunner:
 
 
 @dataclass
+class FakeWorkspaceClient:
+    owner: FakePlanningHerdr
+
+    def find(self, workspace_id: str) -> WorkspaceInfo | None:
+        return self.owner.workspace_find(workspace_id)
+
+
+@dataclass
+class FakeTabClient:
+    owner: FakePlanningHerdr
+
+    def find(self, tab_id: str) -> TabInfo | None:
+        return self.owner.tab_find(tab_id)
+
+
+@dataclass
 class FakePlanningHerdr:
     workspaces: dict[str, WorkspaceInfo] = field(default_factory=dict)
     tabs: dict[str, TabInfo] = field(default_factory=dict)
     lookup_calls: list[tuple[str, str]] = field(default_factory=list)
     close_calls: list[str] = field(default_factory=list)
+    workspace: FakeWorkspaceClient = field(init=False)
+    tab: FakeTabClient = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.workspace = FakeWorkspaceClient(self)
+        self.tab = FakeTabClient(self)
 
     def workspace_find(self, workspace_id: str) -> WorkspaceInfo | None:
         self.lookup_calls.append(("workspace", workspace_id))
@@ -282,10 +303,10 @@ def test_herdr_cleanup_lookup_uses_exact_stored_ids() -> None:
         )
     )
 
-    assert HerdrClient(workspace_runner).workspace_find("w9") == WorkspaceInfo(
+    assert HerdrClient(workspace_runner).workspace.find("w9") == WorkspaceInfo(
         "w9", "stored workspace"
     )
-    assert HerdrClient(tab_runner).tab_find("w9:t33") == TabInfo("w9:t33", "w9", "stored tab")
+    assert HerdrClient(tab_runner).tab.find("w9:t33") == TabInfo("w9:t33", "w9", "stored tab")
     assert workspace_runner.calls == [("herdr", "workspace", "list")]
     assert tab_runner.calls == [("herdr", "tab", "list")]
 
@@ -293,7 +314,7 @@ def test_herdr_cleanup_lookup_uses_exact_stored_ids() -> None:
 def test_herdr_cleanup_lookup_reports_absent_exact_id() -> None:
     runner = RecordingRunner(CommandResult(0, json.dumps({"result": {"workspaces": []}}), ""))
 
-    assert HerdrClient(runner).workspace_find("w9") is None
+    assert HerdrClient(runner).workspace.find("w9") is None
 
 
 def test_plan_blocks_task_root_outside_tasks_directory(

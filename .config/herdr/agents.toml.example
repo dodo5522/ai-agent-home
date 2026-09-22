@@ -1,0 +1,10 @@
+# Copy this file to agents.toml and customize it for the local machine.
+# The actual agents.toml is intentionally not tracked because cwd is local.
+
+# Long-lived repository coordinator, not a shared Issue worker pool.
+# role is descriptive metadata; automatic Issue dispatch is not implemented.
+# The target Workspace and available Pane must already exist.
+# [agents.codex-coordinator]
+# role = "coordinator"
+# workspace = "dodo5522/ai-agent-home"
+# cwd = "/home/takashi"

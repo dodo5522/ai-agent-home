@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .errors import LifecycleError
+from .errors import RuntimeCommandError
 
 
 @dataclass(frozen=True)
@@ -50,5 +50,5 @@ class SubprocessRunner:
                 env=environment,
             )
         except OSError as error:
-            raise LifecycleError(f"cannot execute {arguments[0]}") from error
+            raise RuntimeCommandError(f"cannot execute {arguments[0]}") from error
         return CommandResult(completed.returncode, completed.stdout, completed.stderr)

@@ -7,11 +7,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
 
+from herdr_runtime import CommandRunner, HerdrClient, HerdrRuntimeError, SubprocessRunner
 from herdr_task_state.model import CleanupProgress, Task, TaskKey
 
 from ...errors import LifecycleError
-from ...herdr import HerdrClient, _HerdrPlanningOperations
-from ...runner import CommandRunner, SubprocessRunner
+from ...herdr_operations import HerdrPlanningOperations
 from ...state import TaskStateRepository
 from .planner import (
     _TASKS_DIRECTORY,
@@ -32,11 +32,10 @@ _UNTRACKED_ACTION_ORDER: tuple[CleanupActionName, ...] = (
 )
 
 
-class _HerdrCleanupOperations(_HerdrPlanningOperations, Protocol):
+class _HerdrCleanupOperations(HerdrPlanningOperations, Protocol):
     """Herdr operations needed to validate and execute Tab cleanup."""
 
-    def tab_close(self, tab_id: str) -> None:
-        """Close one exact validated Tab ID."""
+    """Herdr operations needed to validate and execute Tab cleanup."""
 
 
 @dataclass(frozen=True)
@@ -193,7 +192,7 @@ class CleanupExecutor:
         if self._revalidate_target(task_key, action_name, target) == "already_absent":
             return
         if action_name == "tab":
-            self._herdr.tab_close(target)
+            self._herdr.tab.close(target)
         elif action_name == "untracked":
             path = Path(target)
             if not path.exists() and not path.is_symlink():
@@ -323,7 +322,7 @@ class CleanupExecutor:
                     self._progress(task_root, phase, completed, completed_targets),
                 )
             self._state.remove_task_after_cleanup(plan.task_key)
-        except (LifecycleError, OSError) as error:
+        except (LifecycleError, HerdrRuntimeError, OSError) as error:
             self._record_failure(plan.task_key, task_root, completed, completed_targets)
             raise LifecycleError(f"cleanup {current_action} failed") from error
 

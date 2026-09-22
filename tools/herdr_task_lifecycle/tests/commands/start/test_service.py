@@ -4,22 +4,31 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-from herdr_task_state.model import HerdrReference, Task, TaskState, Workstream
-from herdr_task_state.store import StateStore
-
-from herdr_task_lifecycle.cli import main as lifecycle_main
-from herdr_task_lifecycle.commands.start.service import TaskStarter, TaskStartResolution
-from herdr_task_lifecycle.errors import LifecycleError
-from herdr_task_lifecycle.herdr import (
+from herdr_runtime import (
+    CommandResult,
     CreatedResources,
     HerdrClient,
+    HerdrError,
     PaneInfo,
     TabInfo,
     WorkspaceInfo,
-    _HerdrOperations,
 )
+from herdr_task_state.model import (
+    AgentReference,
+    HerdrReference,
+    Task,
+    TaskKey,
+    TaskState,
+    Workstream,
+)
+from herdr_task_state.store import StateStore
+
+from herdr_task_lifecycle.cli import main as lifecycle_main
+from herdr_task_lifecycle.commands.start.implementer import TaskAgentStarter
+from herdr_task_lifecycle.commands.start.service import TaskStarter, TaskStartResolution
+from herdr_task_lifecycle.errors import LifecycleError
+from herdr_task_lifecycle.herdr_operations import HerdrOperations
 from herdr_task_lifecycle.identity import load_issue_title, resolve_repository, short_title
-from herdr_task_lifecycle.runner import CommandResult
 
 
 @dataclass
@@ -76,7 +85,46 @@ class RecordingRunner:
 
 
 @dataclass
-class FakeHerdr(_HerdrOperations):
+class FakeWorkspaceClient:
+    owner: FakeHerdr
+
+    def get(self, workspace_id: str) -> WorkspaceInfo:
+        return self.owner.workspace_get(workspace_id)
+
+    def create(self, label: str, cwd: Path) -> CreatedResources:
+        return self.owner.workspace_create(label, cwd)
+
+    def close(self, workspace_id: str) -> None:
+        self.owner.workspace_close(workspace_id)
+
+
+@dataclass
+class FakeTabClient:
+    owner: FakeHerdr
+
+    def get(self, tab_id: str) -> TabInfo:
+        return self.owner.tab_get(tab_id)
+
+    def create(self, workspace_id: str, label: str, cwd: Path) -> CreatedResources:
+        return self.owner.tab_create(workspace_id, label, cwd)
+
+    def rename(self, tab_id: str, label: str) -> TabInfo:
+        return self.owner.tab_rename(tab_id, label)
+
+    def close(self, tab_id: str) -> None:
+        self.owner.tab_close(tab_id)
+
+
+@dataclass
+class FakePaneClient:
+    owner: FakeHerdr
+
+    def for_tab(self, workspace_id: str, tab_id: str) -> list[PaneInfo]:
+        return self.owner.panes_for_workspace(workspace_id, tab_id)
+
+
+@dataclass
+class FakeHerdr(HerdrOperations):
     calls: list[tuple[str, ...]] = field(default_factory=list)
     workspaces: dict[str, WorkspaceInfo] = field(default_factory=dict)
     tabs: dict[str, TabInfo] = field(default_factory=dict)
@@ -85,6 +133,14 @@ class FakeHerdr(_HerdrOperations):
     next_tab: CreatedResources = CreatedResources("w9", "w9:t3", "w9:p4")
     fail_create: bool = False
     fail_rename: bool = False
+    workspace: FakeWorkspaceClient = field(init=False)
+    tab: FakeTabClient = field(init=False)
+    pane: FakePaneClient = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.workspace = FakeWorkspaceClient(self)
+        self.tab = FakeTabClient(self)
+        self.pane = FakePaneClient(self)
 
     def workspace_get(self, workspace_id: str) -> WorkspaceInfo:
         self.calls.append(("workspace", "get", workspace_id))
@@ -146,9 +202,20 @@ class FakeHerdr(_HerdrOperations):
         self.panes[tab_id] = [PaneInfo(pane_id, tab_id) for pane_id in pane_ids]
 
 
-def test_herdr_implementations_explicitly_extend_operations_protocol() -> None:
-    assert _HerdrOperations in HerdrClient.__bases__
-    assert _HerdrOperations in FakeHerdr.__bases__
+@dataclass
+class RecordingTaskAgentStarter:
+    calls: list[tuple[str, str, str]] = field(default_factory=list)
+    fail: bool = False
+
+    def ensure_implementer(self, task_key: TaskKey, task: Task, pane_id: str) -> AgentReference:
+        if self.fail:
+            raise LifecycleError("Agent start failed")
+        self.calls.append((str(task_key), task.title or "", pane_id))
+        return AgentReference(name="codex-issue-32-test")
+
+
+def test_fake_herdr_explicitly_extends_operations_protocol() -> None:
+    assert HerdrOperations in FakeHerdr.__bases__
 
 
 @dataclass
@@ -165,12 +232,18 @@ class StartFixture:
     primary_worktree: Path
     branch: str = "feat/issue-32-herdr-task-start"
 
-    def run(self, issue_number: int = 32, cwd: Path | None = None) -> TaskStartResolution:
+    def run(
+        self,
+        issue_number: int = 32,
+        cwd: Path | None = None,
+        agent_starter: TaskAgentStarter | None = None,
+    ) -> TaskStartResolution:
         return TaskStarter(
             self.state_path,
             runner=self.runner,
             herdr=self.herdr,
             task_roots_directory=self.tasks_directory,
+            agent_starter=agent_starter,
         ).start(issue_number, cwd or self.worktree)
 
     def git_command(self, cwd: Path, *arguments: str) -> list[str]:
@@ -421,7 +494,7 @@ def test_workspace_get_parses_identity() -> None:
         ),
     )
 
-    assert HerdrClient(runner).workspace_get("w9") == WorkspaceInfo("w9", "owner/repo")
+    assert HerdrClient(runner).workspace.get("w9") == WorkspaceInfo("w9", "owner/repo")
 
 
 def test_workspace_create_parses_ids_and_no_focus() -> None:
@@ -452,7 +525,7 @@ def test_workspace_create_parses_ids_and_no_focus() -> None:
         ),
     )
 
-    assert HerdrClient(runner).workspace_create(
+    assert HerdrClient(runner).workspace.create(
         "owner/repo", Path("/tmp/work")
     ) == CreatedResources("w9", "w9:t2", "w9:p3")
 
@@ -507,11 +580,11 @@ def test_tab_operations_parse_identity_and_use_no_focus() -> None:
     )
     client = HerdrClient(runner)
 
-    assert client.tab_get("w9:t2") == TabInfo("w9:t2", "w9", "32 title")
-    assert client.tab_create("w9", "32 title", Path("/tmp/work")) == CreatedResources(
+    assert client.tab.get("w9:t2") == TabInfo("w9:t2", "w9", "32 title")
+    assert client.tab.create("w9", "32 title", Path("/tmp/work")) == CreatedResources(
         "w9", "w9:t3", "w9:p4"
     )
-    assert client.tab_rename("w9:t2", "32 title") == TabInfo("w9:t2", "w9", "32 title")
+    assert client.tab.rename("w9:t2", "32 title") == TabInfo("w9:t2", "w9", "32 title")
 
 
 def test_panes_for_workspace_filters_by_tab() -> None:
@@ -534,7 +607,7 @@ def test_panes_for_workspace_filters_by_tab() -> None:
         ),
     )
 
-    assert HerdrClient(runner).panes_for_workspace("w9", "w9:t2") == [PaneInfo("w9:p1", "w9:t2")]
+    assert HerdrClient(runner).pane.for_tab("w9", "w9:t2") == [PaneInfo("w9:p1", "w9:t2")]
 
 
 def test_herdr_failures_and_malformed_json_are_rejected_without_echoing_output() -> None:
@@ -543,8 +616,8 @@ def test_herdr_failures_and_malformed_json_are_rejected_without_echoing_output()
         ["herdr", "workspace", "get", "w9"],
         CommandResult(1, "secret stdout", "secret stderr"),
     )
-    with pytest.raises(LifecycleError) as error:
-        HerdrClient(runner).workspace_get("w9")
+    with pytest.raises(HerdrError) as error:
+        HerdrClient(runner).workspace.get("w9")
     assert "secret" not in str(error.value)
 
     malformed = RecordingRunner()
@@ -552,8 +625,8 @@ def test_herdr_failures_and_malformed_json_are_rejected_without_echoing_output()
         ["herdr", "workspace", "get", "w9"],
         CommandResult(0, "not json", ""),
     )
-    with pytest.raises(LifecycleError, match="JSON"):
-        HerdrClient(malformed).workspace_get("w9")
+    with pytest.raises(HerdrError, match="JSON"):
+        HerdrClient(malformed).workspace.get("w9")
 
 
 def test_herdr_response_missing_identity_is_rejected() -> None:
@@ -563,8 +636,8 @@ def test_herdr_response_missing_identity_is_rejected() -> None:
         CommandResult(0, json.dumps({"result": {"workspace": {"label": "owner/repo"}}}), ""),
     )
 
-    with pytest.raises(LifecycleError, match="workspace"):
-        HerdrClient(runner).workspace_get("w9")
+    with pytest.raises(HerdrError, match="workspace"):
+        HerdrClient(runner).workspace.get("w9")
 
 
 def test_first_start_creates_and_persists(start_fixture: StartFixture) -> None:
@@ -575,6 +648,41 @@ def test_first_start_creates_and_persists(start_fixture: StartFixture) -> None:
     assert result.pane_id == "w9:p3"
     assert result.task.workstreams["main"].pane_ids == {"root": "w9:p3"}
     assert start_fixture.state().tasks["dodo5522/ai-agent-home#32"] == result.task
+
+
+def test_start_invokes_task_agent_and_persists_reference(start_fixture: StartFixture) -> None:
+    agent_starter = RecordingTaskAgentStarter()
+
+    result = start_fixture.run(32, agent_starter=agent_starter)
+
+    assert agent_starter.calls == [("dodo5522/ai-agent-home#32", "Herdr task-start", "w9:p3")]
+    assert result.task.workstreams["main"].agents == {
+        "implementer": AgentReference(name="codex-issue-32-test")
+    }
+
+
+def test_restarting_task_does_not_duplicate_task_agent(start_fixture: StartFixture) -> None:
+    agent_starter = RecordingTaskAgentStarter()
+
+    start_fixture.run(32, agent_starter=agent_starter)
+    result = start_fixture.run(32, agent_starter=agent_starter)
+
+    assert len(agent_starter.calls) == 2
+    assert result.task.workstreams["main"].agents == {
+        "implementer": AgentReference(name="codex-issue-32-test")
+    }
+
+
+def test_failed_task_agent_start_keeps_resources_for_retry(start_fixture: StartFixture) -> None:
+    agent_starter = RecordingTaskAgentStarter(fail=True)
+
+    with pytest.raises(LifecycleError, match="Agent start"):
+        start_fixture.run(32, agent_starter=agent_starter)
+
+    assert (
+        start_fixture.state().tasks["dodo5522/ai-agent-home#32"].workstreams["main"].agents is None
+    )
+    assert not start_fixture.herdr.was_called("workspace", "close", "w9")
 
 
 def test_first_start_persists_worktree_branch_and_hash_label(start_fixture: StartFixture) -> None:

@@ -4,6 +4,14 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from herdr_runtime import (
+    CommandRunner,
+    CreatedResources,
+    HerdrClient,
+    HerdrError,
+    SubprocessRunner,
+    WorkspaceInfo,
+)
 from herdr_task_state.model import (
     HerdrReference,
     StateValidationError,
@@ -15,10 +23,10 @@ from herdr_task_state.model import (
 from herdr_task_state.store import StateFilesystemError, StateStore
 
 from ...errors import LifecycleError
-from ...herdr import CreatedResources, HerdrClient, WorkspaceInfo, _HerdrOperations
+from ...herdr_operations import HerdrOperations
 from ...identity import load_issue_title, resolve_repository, short_title
-from ...runner import CommandRunner, SubprocessRunner
 from ...worktree import TASK_ROOTS_DIRECTORY, resolve_managed_worktree
+from .implementer import TaskAgentStarter
 
 
 @dataclass(frozen=True)
@@ -40,13 +48,15 @@ class TaskStarter:
         self,
         state_path: Path,
         runner: CommandRunner | None = None,
-        herdr: _HerdrOperations | None = None,
+        herdr: HerdrOperations | None = None,
         task_roots_directory: Path = TASK_ROOTS_DIRECTORY,
+        agent_starter: TaskAgentStarter | None = None,
     ) -> None:
         self._runner = runner or SubprocessRunner()
         self._herdr = herdr or HerdrClient(self._runner)
         self._store = StateStore(state_path)
         self._task_roots_directory = task_roots_directory
+        self._agent_starter = agent_starter
 
     def _read_state(self) -> TaskState:
         if not self._store.path.exists() and not self._store.path.is_symlink():
@@ -69,8 +79,8 @@ class TaskStarter:
         valid: list[WorkspaceInfo] = []
         for workspace_id in candidates:
             try:
-                workspace = self._herdr.workspace_get(workspace_id)
-            except LifecycleError:
+                workspace = self._herdr.workspace.get(workspace_id)
+            except (HerdrError, LifecycleError):
                 continue
             if workspace.label == repository:
                 valid.append(workspace)
@@ -78,7 +88,7 @@ class TaskStarter:
             raise LifecycleError("multiple managed workspaces match repository")
         if valid:
             return valid[0].workspace_id, None
-        created = self._herdr.workspace_create(repository, cwd)
+        created = self._herdr.workspace.create(repository, cwd)
         return created.workspace_id, created
 
     def _validate_existing_tab(
@@ -94,8 +104,8 @@ class TaskStarter:
         if tab_id is None:
             return None
         try:
-            tab = self._herdr.tab_get(tab_id)
-        except LifecycleError:
+            tab = self._herdr.tab.get(tab_id)
+        except (HerdrError, LifecycleError):
             return None
         if tab.workspace_id != workspace_id:
             return None
@@ -104,14 +114,14 @@ class TaskStarter:
         is_legacy_label = tab.label == legacy_label and stored_label == legacy_label
         if not is_current_label and not is_legacy_label:
             return None
-        panes = self._herdr.panes_for_workspace(workspace_id, tab_id)
+        panes = self._herdr.pane.for_tab(workspace_id, tab_id)
         if len(panes) != 1:
             raise LifecycleError("managed tab must contain exactly one pane")
         stored_pane_id = (task.workstreams["main"].pane_ids or {}).get("root")
         if stored_pane_id is not None and panes[0].pane_id != stored_pane_id:
             return None
         if is_legacy_label:
-            renamed = self._herdr.tab_rename(tab_id, label)
+            renamed = self._herdr.tab.rename(tab_id, label)
             if renamed.workspace_id != workspace_id or renamed.label != label:
                 raise LifecycleError("managed tab identity mismatch after rename")
         return tab_id, panes[0].pane_id
@@ -119,7 +129,7 @@ class TaskStarter:
     def _validate_created_tab(
         self, workspace_id: str, created: CreatedResources
     ) -> tuple[str, str]:
-        panes = self._herdr.panes_for_workspace(workspace_id, created.tab_id)
+        panes = self._herdr.pane.for_tab(workspace_id, created.tab_id)
         if len(panes) != 1 or panes[0].pane_id != created.pane_id:
             raise LifecycleError("created tab must contain exactly one root pane")
         return created.tab_id, created.pane_id
@@ -167,7 +177,7 @@ class TaskStarter:
             workspace_id, created_workspace = self._workspace_for_repository(state, repository, cwd)
             if created_workspace is not None:
                 created_workspace_id = workspace_id
-                renamed = self._herdr.tab_rename(created_workspace.tab_id, tab_label)
+                renamed = self._herdr.tab.rename(created_workspace.tab_id, tab_label)
                 if renamed.workspace_id != workspace_id or renamed.label != tab_label:
                     raise LifecycleError("created tab identity mismatch")
                 tab_id, pane_id = self._validate_created_tab(workspace_id, created_workspace)
@@ -179,7 +189,7 @@ class TaskStarter:
                     legacy_tab_label,
                 )
                 if existing is None:
-                    created = self._herdr.tab_create(workspace_id, tab_label, cwd)
+                    created = self._herdr.tab.create(workspace_id, tab_label, cwd)
                     created_tab_id = created.tab_id
                     tab_id, pane_id = self._validate_created_tab(workspace_id, created)
                 else:
@@ -222,16 +232,43 @@ class TaskStarter:
                 stored = self._store.put(str(task_key), updated)
             except (StateFilesystemError, StateValidationError) as error:
                 raise LifecycleError("cannot write task state") from error
+            created_workspace_id = None
+            created_tab_id = None
+            if self._agent_starter is not None:
+                try:
+                    agent = self._agent_starter.ensure_implementer(task_key, stored, pane_id)
+                    main = stored.workstreams["main"]
+                    updated_main = main.model_copy(
+                        update={
+                            "agents": {
+                                **(main.agents or {}),
+                                "implementer": agent,
+                            }
+                        }
+                    )
+                    stored = self._store.put(
+                        str(task_key),
+                        stored.model_copy(
+                            update={
+                                "workstreams": {
+                                    **stored.workstreams,
+                                    "main": updated_main,
+                                }
+                            }
+                        ),
+                    )
+                except (StateFilesystemError, StateValidationError) as error:
+                    raise LifecycleError("cannot write Agent state") from error
             return TaskStartResolution(stored, task_key, workspace_id, tab_id, pane_id, cwd)
         except Exception:
             if created_workspace_id is not None:
                 try:
-                    self._herdr.workspace_close(created_workspace_id)
-                except LifecycleError:
+                    self._herdr.workspace.close(created_workspace_id)
+                except (HerdrError, LifecycleError):
                     pass
             elif created_tab_id is not None:
                 try:
-                    self._herdr.tab_close(created_tab_id)
-                except LifecycleError:
+                    self._herdr.tab.close(created_tab_id)
+                except (HerdrError, LifecycleError):
                     pass
             raise

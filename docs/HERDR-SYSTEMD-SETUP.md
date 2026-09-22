@@ -96,15 +96,23 @@ journalctl --user -u herdr.service -u herdr-agents.service -b --no-pager
 - `herdr.service` が `active (running)`
 - `herdr-agents.service` が `active (exited)`
 - `herdr status` で server が running / compatible
-- `herdr agent list` に Codex Agent が1つだけ存在
+- `herdr agent list` に設定済み Agent が名前単位で存在
 
 ## 復旧ロジック
 
 1. Herdr server が running / compatible になるまで最大120秒待機
-2. live Codex Agent があれば何もせず終了
-3. 既存 workspace 内の空いている shell pane を動的に選択
-4. 利用可能な pane がなければ workspace を作り、返却 JSON から pane ID を取得
-5. Codex session index に保存 session があれば `resume --last --all`
-6. resume が失敗した場合は Agent 一覧を再確認し、Agent が出現していなければ新規起動
+2. `.config/herdr/agents.toml` の定義を読み込む（初回は
+   `.config/herdr/agents.toml.example` をコピーして作成）
+3. 独立した `tools/herdr_agents` の `herdr-agents reconcile` を実行する
+4. Agent 名を完全一致で live Agent 一覧と照合する
+5. 不在 Agent だけを Workspace/cwd に一致する明示 Pane で起動する
+6. 1 Agent の起動失敗を他 Agent の再起動理由にしない
+
+`herdr_agents` は共通Agent操作を提供しますが、このsystemd経路でTOMLから
+reconcileされたAgentだけが常設対象です。Issue Agentは`herdr_task_lifecycle`が
+同じ共通操作を利用して起動し、Issueのtask stateとcleanupに従います。
+この bootstrap は Agent 名単位の起動・復旧だけを担当します。Codex
+session の対応付けと resume は #10、モデル選択と複雑度ベースの routing は
+#44 の責務です。
 
 固定の `w1:p1` などは使用していません。
