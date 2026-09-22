@@ -69,6 +69,7 @@ test_blender_batch_installation() {
     assert_contains "$output" "blender --background --factory-startup" "Blender headless startup is verified"
     config=$(<"$MISE_CONFIG")
     assert_contains "$config" 'blender = "5.2.2"' "Blender remains pinned"
+    assert_contains "$config" 'codex = "0.155.1"' "Codex remains pinned"
     config=$(<"$CODEX_CONFIG")
     if [[ $output == *mcp-for-blender* || $output == *tools/blender_mcp* ||
           $config == *'[mcp_servers.blender]'* ||
