@@ -3,7 +3,7 @@
 ## 構成
 
 - Herdr: `0.8.2` (`/home/takashi/.local/bin/herdr`)
-- Codex CLI: `0.153.2` (`/home/takashi/.local/share/mise/shims/codex`)
+- Codex CLI: `0.155.1` (`/home/takashi/.local/share/mise/shims/codex`)
 - Herdr server: `~/.config/systemd/user/herdr.service`
 - Agent 復旧: `~/.config/systemd/user/herdr-agents.service`
 - Agent 起動スクリプト: `~/bin/start-herdr-agents.sh`

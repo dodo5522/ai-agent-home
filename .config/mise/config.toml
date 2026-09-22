@@ -1,6 +1,6 @@
 [tools]
 blender = "5.2.2"
-codex = "0.152.0"
+codex = "0.155.1"
 herdr = "0.8.2"
 node = "24.20.0"
 python = "3.14.7"
