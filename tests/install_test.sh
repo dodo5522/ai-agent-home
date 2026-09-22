@@ -8,7 +8,6 @@ CODEX_CONFIG="$REPO_ROOT/.codex/config.toml"
 HERDR_SKILL="$REPO_ROOT/.codex/skills/herdr/SKILL.md"
 HERDR_SKILL_PROVENANCE="$REPO_ROOT/.codex/skills/herdr/UPSTREAM.md"
 HERDR_SKILL_DOC="$REPO_ROOT/docs/HERDR-SKILL.md"
-HERDR_SYSTEMD_DOC="$REPO_ROOT/docs/HERDR-SYSTEMD-SETUP.md"
 HERDR_TASK_STATE_CLI="$REPO_ROOT/bin/herdr-task-state"
 HERDR_TASK_STATE_PROJECT="$REPO_ROOT/tools/herdr_task_state/pyproject.toml"
 HERDR_TASK_STATE_DOC="$REPO_ROOT/docs/HERDR-TASK-STATE.md"
@@ -71,8 +70,6 @@ test_blender_batch_installation() {
     config=$(<"$MISE_CONFIG")
     assert_contains "$config" 'blender = "5.2.2"' "Blender remains pinned"
     assert_contains "$config" 'codex = "0.155.1"' "Codex remains pinned"
-    assert_contains "$(<"$HERDR_SYSTEMD_DOC")" 'Codex CLI: `0.155.1`' \
-        "Herdr setup documents the pinned Codex version"
     config=$(<"$CODEX_CONFIG")
     if [[ $output == *mcp-for-blender* || $output == *tools/blender_mcp* ||
           $config == *'[mcp_servers.blender]'* ||

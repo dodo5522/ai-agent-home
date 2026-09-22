@@ -2,13 +2,15 @@
 
 ## 構成
 
-- Herdr: `0.8.2` (`/home/takashi/.local/bin/herdr`)
-- Codex CLI: `0.155.1` (`/home/takashi/.local/share/mise/shims/codex`)
+- Herdr / Codex CLI: [mise設定](../.config/mise/config.toml)でバージョンを管理
+  （`/home/takashi/.local/share/mise/shims/` 経由）
 - Herdr server: `~/.config/systemd/user/herdr.service`
 - Agent 復旧: `~/.config/systemd/user/herdr-agents.service`
 - Agent 起動スクリプト: `~/bin/start-herdr-agents.sh`
 
 両 unit はすでに `systemctl --user enable` 済みです。
+
+現在選択されているバージョンは `mise current herdr codex` で確認します。
 
 ## 初回切替
 
