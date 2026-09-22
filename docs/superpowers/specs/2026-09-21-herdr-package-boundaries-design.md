@@ -72,13 +72,15 @@ implementer role, initial Issue instructions, and persistence in task state.
 
 Move the existing adapter's task-specific Workspace/Tab operation Protocols
 into lifecycle. In the runtime, keep generic resource dataclasses and expose
-focused clients through `HerdrClient.workspace`, `.tab`, `.pane`, and `.agent`;
+focused clients through `HerdrClient.workspace`, `.tab`, `.pane`, and `.agent`.
+Keep all Client classes in the private-layout `herdr_runtime.clients` package;
 the facade itself only composes those clients over a shared JSON transport.
 Agent lookup belongs to the Agent client rather than the `AgentInfo` value or
-the policy-level `AgentManager`. Agent operation Protocols and the generic
-service belong to herdr_agents. Use concrete JSON boundary types (Any/cast only
-at decoding boundaries) instead of spreading object-valued mappings into
-application APIs.
+the policy-level `AgentManager`. Private recursive JSON types and required or
+optional field validators live in `_decoding.py`; they are not re-exported from
+the package. Agent operation Protocols and the generic service belong to
+herdr_agents. Cast only at the `json.loads` boundary instead of spreading
+untyped mappings into application APIs.
 
 ## Commands, packaging and errors
 

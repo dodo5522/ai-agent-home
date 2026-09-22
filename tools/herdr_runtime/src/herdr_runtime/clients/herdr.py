@@ -1,11 +1,11 @@
 """Composition root for typed Herdr resource clients."""
 
-from .agents import AgentClient
-from .panes import PaneClient
-from .runner import CommandRunner
-from .tabs import TabClient
-from .transport import HerdrTransport
-from .workspaces import WorkspaceClient
+from ..runner import CommandRunner
+from ..transport import HerdrTransport
+from .agent import AgentClient
+from .pane import PaneClient
+from .tab import TabClient
+from .workspace import WorkspaceClient
 
 
 class HerdrClient:

@@ -1,29 +1,29 @@
 """Typed Herdr Agent operations."""
 
-from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
 
-from .errors import HerdrError
-from .models import AgentInfo
-from .transport import HerdrTransport
+from .._decoding import JsonObject, required_object, required_string
+from ..errors import HerdrError
+from ..models import AgentInfo
+from ..transport import HerdrTransport
 
 
 class AgentClient:
     def __init__(self, transport: HerdrTransport) -> None:
         self._transport = transport
 
-    def _info(self, agent: Mapping[str, object]) -> AgentInfo:
+    @staticmethod
+    def _info(agent: JsonObject) -> AgentInfo:
         session = agent.get("agent_session")
         kind = "codex"
         if isinstance(session, dict) and isinstance(session.get("agent"), str):
-            kind = self._transport.string(cast(Mapping[str, object], session), "agent")
+            kind = required_string(session, "agent")
         return AgentInfo(
-            name=self._transport.string(agent, "agent"),
+            name=required_string(agent, "agent"),
             kind=kind,
-            pane_id=self._transport.string(agent, "pane_id"),
-            workspace_id=self._transport.string(agent, "workspace_id"),
-            cwd=Path(self._transport.string(agent, "cwd")),
+            pane_id=required_string(agent, "pane_id"),
+            workspace_id=required_string(agent, "workspace_id"),
+            cwd=Path(required_string(agent, "cwd")),
         )
 
     def list(self) -> list[AgentInfo]:
@@ -34,7 +34,7 @@ class AgentClient:
         for raw_item in raw_items:
             if not isinstance(raw_item, dict):
                 raise HerdrError("Herdr Agent response contains an invalid Agent")
-            items.append(self._info(cast(Mapping[str, object], raw_item)))
+            items.append(self._info(raw_item))
         return items
 
     def find(self, name: str) -> AgentInfo | None:
@@ -44,7 +44,7 @@ class AgentClient:
         payload = self._transport.request(
             ["agent", "start", name, "--kind", kind, "--pane", pane_id]
         )
-        agent = self._info(self._transport.member(payload, "agent"))
+        agent = self._info(required_object(payload, "agent"))
         if agent.name != name or agent.pane_id != pane_id or agent.kind != kind:
             raise HerdrError("Herdr Agent start response has inconsistent identity")
         return agent

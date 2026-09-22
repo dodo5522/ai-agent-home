@@ -1,33 +1,26 @@
 """Typed Herdr pane operations."""
 
-from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
 
-from .errors import HerdrError
-from .models import PaneInfo
-from .transport import HerdrTransport
+from .._decoding import JsonObject, optional_string, required_object, required_string
+from ..errors import HerdrError
+from ..models import PaneInfo
+from ..transport import HerdrTransport
 
 
 class PaneClient:
     def __init__(self, transport: HerdrTransport) -> None:
         self._transport = transport
 
-    def _info(self, pane: Mapping[str, object]) -> PaneInfo:
-        cwd_value = pane.get("cwd")
-        cwd = None
-        if cwd_value is not None:
-            cwd = Path(
-                self._transport.string(cast(Mapping[str, object], {"cwd": cwd_value}), "cwd")
-            )
-        workspace_value = pane.get("workspace_id")
-        agent_value = pane.get("agent")
+    @staticmethod
+    def _info(pane: JsonObject) -> PaneInfo:
+        cwd = optional_string(pane, "cwd")
         return PaneInfo(
-            self._transport.string(pane, "pane_id"),
-            self._transport.string(pane, "tab_id"),
-            workspace_value if isinstance(workspace_value, str) else None,
-            cwd,
-            agent_value if isinstance(agent_value, str) else None,
+            required_string(pane, "pane_id"),
+            required_string(pane, "tab_id"),
+            optional_string(pane, "workspace_id"),
+            None if cwd is None else Path(cwd),
+            optional_string(pane, "agent"),
         )
 
     def list(self, workspace_id: str) -> list[PaneInfo]:
@@ -40,7 +33,7 @@ class PaneClient:
         for raw_item in raw_items:
             if not isinstance(raw_item, dict):
                 raise HerdrError("Herdr pane response contains an invalid pane")
-            pane = self._info(cast(Mapping[str, object], raw_item))
+            pane = self._info(raw_item)
             if pane.workspace_id is not None and pane.workspace_id != workspace_id:
                 raise HerdrError("Herdr pane workspace identity mismatch")
             items.append(pane)
@@ -50,7 +43,7 @@ class PaneClient:
         return [pane for pane in self.list(workspace_id) if pane.tab_id == tab_id]
 
     def get(self, pane_id: str) -> PaneInfo:
-        pane = self._transport.member(self._transport.request(["pane", "get", pane_id]), "pane")
-        if self._transport.string(pane, "pane_id") != pane_id:
+        pane = required_object(self._transport.request(["pane", "get", pane_id]), "pane")
+        if required_string(pane, "pane_id") != pane_id:
             raise HerdrError("Herdr pane identity mismatch")
         return self._info(pane)

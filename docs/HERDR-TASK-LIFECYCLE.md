@@ -76,7 +76,8 @@ and approved cleanup of one Issue without affecting the other or the
 coordinator. Package boundaries are implemented on this branch: lifecycle owns
 Issue policy, `herdr_agents` owns generic Agent management and persistent
 reconciliation, and `herdr_runtime` exposes focused Workspace, Tab, Pane, and
-Agent clients over the shared Herdr transport.
+Agent clients from its `clients` package over the shared Herdr transport. JSON
+response types and field validation remain private runtime details.
 
 ## Task identity
 
