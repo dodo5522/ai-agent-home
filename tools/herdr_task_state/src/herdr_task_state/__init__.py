@@ -14,15 +14,18 @@ from .model import (
     Workstream,
     migrate_state,
 )
+from .sessions import AgentBinding, SessionMapping
 
 __all__ = [
     "AgentReference",
+    "AgentBinding",
     "CleanupAction",
     "CleanupProgress",
     "HerdrReference",
     "Model",
     "PersistentAgentReference",
     "StateValidationError",
+    "SessionMapping",
     "Task",
     "TaskKey",
     "TaskState",

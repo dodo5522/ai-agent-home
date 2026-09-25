@@ -1,6 +1,7 @@
 """Command-line interface for Herdr task state."""
 
 import argparse
+import json
 import os
 import stat
 import sys
@@ -130,6 +131,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="TASK_KEY",
         help="Stable task key in owner/repository#issue-number format.",
     )
+    session = sub.add_parser("session", help="Inspect or remove exact Codex session mappings.")
+    session_sub = session.add_subparsers(dest="session_command", required=True)
+    session_list = session_sub.add_parser("list", help="List stored Codex session mappings.")
+    session_list.set_defaults(command="session", session_command="list")
+    session_remove = session_sub.add_parser(
+        "remove", help="Remove one exact Codex session mapping."
+    )
+    session_remove.add_argument("name", metavar="AGENT_NAME")
+    session_remove.set_defaults(command="session", session_command="remove")
     try:
         args = parser.parse_args(argv)
         store = StateStore(_state_path())
@@ -147,6 +157,32 @@ def main(argv: Sequence[str] | None = None) -> int:
             return ExitCode.SUCCESS
         if args.command == "remove":
             _json(store.remove(args.task_key))
+            return ExitCode.SUCCESS
+        if args.command == "session":
+            if args.session_command == "list":
+                print(
+                    json.dumps(
+                        [
+                            {
+                                "name": item.binding.name,
+                                "codex_session_id": item.session_id,
+                                "repository": item.binding.repository,
+                                "workspace_id": item.binding.workspace_id,
+                                "workspace_label": item.binding.workspace_label,
+                                "worktree": str(item.binding.worktree),
+                                "branch": item.binding.branch,
+                                "pane_id": item.binding.pane_id,
+                            }
+                            for item in store.list_sessions()
+                        ],
+                        ensure_ascii=False,
+                    )
+                )
+                return ExitCode.SUCCESS
+            if not args.name:
+                raise StateValidationError("Agent name must be non-empty")
+            store.clear_session(args.name)
+            _json(store.read())
             return ExitCode.SUCCESS
         return ExitCode.USAGE_ERROR
     except KeyError:
