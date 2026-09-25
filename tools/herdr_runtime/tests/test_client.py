@@ -81,6 +81,68 @@ def test_agent_start_targets_explicit_pane() -> None:
     assert runner.calls == [command]
 
 
+def test_agent_decodes_codex_session_id() -> None:
+    command = ("herdr", "agent", "list")
+    runner = RecordingRunner(
+        {
+            command: result(
+                {
+                    "agents": [
+                        {
+                            "agent": "codex",
+                            "name": "codex-main",
+                            "pane_id": "w1:p1",
+                            "workspace_id": "w1",
+                            "cwd": "/work/main",
+                            "agent_session": {"agent": "codex", "kind": "id", "value": "session-a"},
+                        }
+                    ]
+                }
+            )
+        }
+    )
+
+    agent = HerdrClient(runner).agent.find("codex-main")
+
+    assert agent is not None
+    assert agent.codex_session_id == "session-a"
+
+
+def test_agent_start_passes_exact_resume_id() -> None:
+    command = (
+        "herdr",
+        "agent",
+        "start",
+        "codex-main",
+        "--kind",
+        "codex",
+        "--pane",
+        "w1:p1",
+        "--",
+        "resume",
+        "session-a",
+    )
+    runner = RecordingRunner(
+        {
+            command: result(
+                {
+                    "agent": {
+                        "agent": "codex",
+                        "name": "codex-main",
+                        "pane_id": "w1:p1",
+                        "workspace_id": "w1",
+                        "cwd": "/work/main",
+                    }
+                }
+            )
+        }
+    )
+
+    HerdrClient(runner).agent.start("codex-main", "w1:p1", native_args=("resume", "session-a"))
+
+    assert runner.calls == [command]
+
+
 def test_agent_prompt_targets_exact_name() -> None:
     command = ("herdr", "agent", "prompt", "codex-main", "start issue 9")
     runner = RecordingRunner({command: result({})})

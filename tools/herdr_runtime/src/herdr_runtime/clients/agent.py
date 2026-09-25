@@ -1,5 +1,6 @@
 """Typed Herdr Agent operations."""
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from .._decoding import JsonObject, optional_string, required_object, required_string
@@ -14,12 +15,24 @@ class AgentClient:
 
     @staticmethod
     def _info(agent: JsonObject) -> AgentInfo:
+        session_id: str | None = None
+        raw_session = agent.get("agent_session")
+        if raw_session is not None:
+            if not isinstance(raw_session, dict):
+                raise HerdrError("Herdr Agent session is invalid")
+            if (
+                required_string(raw_session, "agent") != "codex"
+                or required_string(raw_session, "kind") != "id"
+            ):
+                raise HerdrError("Herdr Agent session is invalid")
+            session_id = required_string(raw_session, "value")
         return AgentInfo(
             name=required_string(agent, "name"),
             kind=required_string(agent, "agent"),
             pane_id=required_string(agent, "pane_id"),
             workspace_id=required_string(agent, "workspace_id"),
             cwd=Path(required_string(agent, "cwd")),
+            codex_session_id=session_id,
         )
 
     def list(self) -> list[AgentInfo]:
@@ -38,9 +51,14 @@ class AgentClient:
     def find(self, name: str) -> AgentInfo | None:
         return next((agent for agent in self.list() if agent.name == name), None)
 
-    def start(self, name: str, pane_id: str, kind: str = "codex") -> AgentInfo:
+    def start(
+        self, name: str, pane_id: str, kind: str = "codex", native_args: Sequence[str] = ()
+    ) -> AgentInfo:
+        arguments = ["agent", "start", name, "--kind", kind, "--pane", pane_id]
+        if native_args:
+            arguments.extend(("--", *native_args))
         payload = self._transport.request(
-            ["agent", "start", name, "--kind", kind, "--pane", pane_id]
+            arguments
         )
         agent = self._info(required_object(payload, "agent"))
         if agent.name != name or agent.pane_id != pane_id or agent.kind != kind:
