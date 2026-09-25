@@ -13,6 +13,7 @@ from .model import (
     Task,
     TaskKey,
     TaskState,
+    migrate_state,
 )
 
 
@@ -99,7 +100,7 @@ class StateStore:
 
     @staticmethod
     def _empty() -> TaskState:
-        return TaskState(version=1, tasks={})
+        return TaskState(version=2, tasks={}, persistent_agents={})
 
     @staticmethod
     def _encode(document: TaskState) -> bytes:
@@ -161,15 +162,17 @@ class StateStore:
         except KeyError as error:
             raise KeyError(task_key) from error
 
+    def _writable_document(self) -> TaskState:
+        current = self._read() if self.path.exists() or self.path.is_symlink() else self._empty()
+        return migrate_state(current)
+
     def put(self, task_key: str, task: Task) -> Task:
         """Validate and atomically store one task under its stable key."""
         key = TaskKey.parse(task_key)
         task.assert_matches(key)
 
         with self._state_lock.locked():
-            current = (
-                self._read() if self.path.exists() or self.path.is_symlink() else self._empty()
-            )
+            current = self._writable_document()
             updated = current.with_task(key, task)
             self._write(updated)
             return task
@@ -179,12 +182,7 @@ class StateStore:
         key = TaskKey.parse(task_key)
 
         with self._state_lock.locked():
-            if not self.path.exists() and not self.path.is_symlink():
-                empty = self._empty()
-                self._write(empty)
-                return empty
-            current = self._read()
+            current = self._writable_document()
             updated = current.without_task(key)
-            if updated is not current:
-                self._write(updated)
+            self._write(updated)
             return updated

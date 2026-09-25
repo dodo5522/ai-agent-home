@@ -6,11 +6,13 @@ from .model import (
     CleanupProgress,
     HerdrReference,
     Model,
+    PersistentAgentReference,
     StateValidationError,
     Task,
     TaskKey,
     TaskState,
     Workstream,
+    migrate_state,
 )
 
 __all__ = [
@@ -19,9 +21,11 @@ __all__ = [
     "CleanupProgress",
     "HerdrReference",
     "Model",
+    "PersistentAgentReference",
     "StateValidationError",
     "Task",
     "TaskKey",
     "TaskState",
     "Workstream",
+    "migrate_state",
 ]

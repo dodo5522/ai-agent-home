@@ -370,3 +370,45 @@ def test_state_file_lock_releases_after_action_failure(tmp_path: Path) -> None:
 
     with lock.locked():
         pass
+
+
+def test_version_two_requires_persistent_agents() -> None:
+    with pytest.raises(StateValidationError, match="persistent_agents"):
+        TaskState.parse('{"version":2,"tasks":{}}')
+
+
+def test_rejects_session_owned_by_issue_and_persistent_agent() -> None:
+    payload = {
+        "version": 2,
+        "tasks": {
+            TASK_KEY: {
+                "repository": "dodo5522/ai-agent-home",
+                "issue_number": 30,
+                "herdr": {"workspace_id": "w1", "workspace_label": "dodo5522/ai-agent-home"},
+                "workstreams": {
+                    "main": {
+                        "worktree": "/work/issue-30",
+                        "branch": "feat/issue-30",
+                        "pane_ids": {"root": "w1:p1"},
+                        "agents": {
+                            "implementer": {"name": "codex-issue-30", "codex_session_id": "same"}
+                        },
+                    }
+                },
+            }
+        },
+        "persistent_agents": {
+            "codex-coordinator": {
+                "codex_session_id": "same",
+                "repository": "dodo5522/ai-agent-home",
+                "workspace_id": "w1",
+                "workspace_label": "dodo5522/ai-agent-home",
+                "worktree": "/work/main",
+                "branch": "main",
+                "pane_id": "w1:p2",
+            }
+        },
+    }
+
+    with pytest.raises(StateValidationError, match="session ID"):
+        TaskState.parse(json.dumps(payload))
