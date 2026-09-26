@@ -13,6 +13,7 @@ from herdr_runtime import (
     WorkspaceInfo,
 )
 from herdr_task_state.model import (
+    AgentReference,
     HerdrReference,
     StateValidationError,
     Task,
@@ -26,7 +27,7 @@ from ...errors import LifecycleError
 from ...herdr_operations import HerdrOperations
 from ...identity import load_issue_title, resolve_repository, short_title
 from ...worktree import TASK_ROOTS_DIRECTORY, resolve_managed_worktree
-from .implementer import TaskAgentStarter
+from .implementer import TaskAgentStarter, task_agent_name
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,7 @@ class TaskStarter:
 
     def _read_state(self) -> TaskState:
         if not self._store.path.exists() and not self._store.path.is_symlink():
-            return TaskState(version=1, tasks={})
+            return TaskState(version=2, tasks={}, persistent_agents={})
         try:
             return self._store.read()
         except (StateFilesystemError, StateValidationError) as error:
@@ -228,6 +229,23 @@ class TaskStarter:
                     "workstreams": {**task.workstreams, "main": updated_main},
                 }
             )
+            if self._agent_starter is not None:
+                agent_name = (updated_main.agents or {}).get("implementer")
+                named_main = updated_main.model_copy(
+                    update={
+                        "agents": {
+                            **(updated_main.agents or {}),
+                            "implementer": AgentReference(
+                                name=task_agent_name(task_key)
+                                if agent_name is None
+                                else agent_name.name
+                            ),
+                        }
+                    }
+                )
+                updated = updated.model_copy(
+                    update={"workstreams": {**updated.workstreams, "main": named_main}}
+                )
             try:
                 stored = self._store.put(str(task_key), updated)
             except (StateFilesystemError, StateValidationError) as error:

@@ -44,14 +44,27 @@ class TaskAgentStarter:
         name = stored.name if stored is not None else task_agent_name(task_key)
         if task.herdr is None:
             raise LifecycleError("task has no Herdr workspace")
-        if main.worktree is None:
-            raise LifecycleError("main workstream has no worktree")
+        if main.worktree is None or main.branch is None:
+            raise LifecycleError("main workstream has incomplete Git identity")
         result = self._manager.ensure(
-            AgentTarget(name, pane_id, task.herdr.workspace_id, Path(main.worktree))
+            AgentTarget(
+                name,
+                pane_id,
+                task.herdr.workspace_id,
+                Path(main.worktree),
+                task.herdr.workspace_label,
+                task.repository,
+                main.branch,
+            )
         )
-        if stored is None:
+        if result.agent.codex_session_id is None:
+            raise LifecycleError("implementer Agent has no Codex session identity")
+        if result.disposition == "fresh":
             self._manager.prompt(result.agent.name, self._initial_prompt(task_key, task))
-        return AgentReference(name=result.agent.name)
+        return AgentReference(
+            name=result.agent.name,
+            codex_session_id=result.agent.codex_session_id,
+        )
 
     @staticmethod
     def _initial_prompt(task_key: TaskKey, task: Task) -> str:

@@ -31,7 +31,8 @@ def task(agent: AgentReference | None = None) -> Task:
 
 @dataclass
 class FakeManager:
-    started: bool
+    disposition: str
+    session_id: str = "session-a"
     targets: list[AgentTarget] = field(default_factory=list)
     prompts: list[tuple[str, str]] = field(default_factory=list)
     fail_prompt: bool = False
@@ -39,8 +40,15 @@ class FakeManager:
     def ensure(self, target: AgentTarget) -> EnsuredAgent:
         self.targets.append(target)
         return EnsuredAgent(
-            AgentInfo(target.name, "codex", target.pane_id, target.workspace_id, target.cwd),
-            self.started,
+            AgentInfo(
+                target.name,
+                "codex",
+                target.pane_id,
+                target.workspace_id,
+                target.cwd,
+                self.session_id,
+            ),
+            self.disposition,
         )
 
     def prompt(self, name: str, text: str) -> None:
@@ -52,37 +60,45 @@ class FakeManager:
 def test_new_agent_uses_exact_target_and_receives_initial_prompt() -> None:
     current = task()
     key = TaskKey(current.repository, current.issue_number)
-    manager = FakeManager(started=True)
+    manager = FakeManager(disposition="fresh")
 
     reference = TaskAgentStarter(manager).ensure_implementer(key, current, "w16:p2")
 
-    assert reference == AgentReference(name=task_agent_name(key))
+    assert reference == AgentReference(name=task_agent_name(key), codex_session_id="session-a")
     assert manager.targets == [
-        AgentTarget(task_agent_name(key), "w16:p2", "w16", Path("/work/issue-9"))
+        AgentTarget(
+            task_agent_name(key),
+            "w16:p2",
+            "w16",
+            Path("/work/issue-9"),
+            "dodo5522/ai-agent-home",
+            "dodo5522/ai-agent-home",
+            "feat/issue-9-agent-management",
+        )
     ]
     assert len(manager.prompts) == 1
     assert "Issue #9" in manager.prompts[0][1]
 
 
-def test_stored_agent_reference_prevents_duplicate_prompt() -> None:
+def test_resumed_agent_does_not_receive_duplicate_prompt() -> None:
     current = task(AgentReference(name="codex-issue-9-stored"))
     key = TaskKey(current.repository, current.issue_number)
-    manager = FakeManager(started=False)
+    manager = FakeManager(disposition="resumed")
 
     reference = TaskAgentStarter(manager).ensure_implementer(key, current, "w16:p2")
 
-    assert reference == AgentReference(name="codex-issue-9-stored")
+    assert reference == AgentReference(name="codex-issue-9-stored", codex_session_id="session-a")
     assert manager.prompts == []
 
 
-def test_unrecorded_live_agent_receives_retry_prompt() -> None:
+def test_unrecorded_live_agent_does_not_receive_initial_prompt() -> None:
     current = task()
     key = TaskKey(current.repository, current.issue_number)
-    manager = FakeManager(started=False)
+    manager = FakeManager(disposition="live")
 
     TaskAgentStarter(manager).ensure_implementer(key, current, "w16:p2")
 
-    assert len(manager.prompts) == 1
+    assert manager.prompts == []
 
 
 def test_prompt_failure_propagates_before_agent_reference_is_returned() -> None:
@@ -90,6 +106,6 @@ def test_prompt_failure_propagates_before_agent_reference_is_returned() -> None:
     key = TaskKey(current.repository, current.issue_number)
 
     with pytest.raises(AgentManagementError, match="prompt failed"):
-        TaskAgentStarter(FakeManager(started=True, fail_prompt=True)).ensure_implementer(
+        TaskAgentStarter(FakeManager(disposition="fresh", fail_prompt=True)).ensure_implementer(
             key, current, "w16:p2"
         )
