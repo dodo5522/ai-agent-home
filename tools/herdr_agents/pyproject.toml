@@ -7,7 +7,7 @@ name = "herdr-agents"
 version = "0.1.0"
 description = "Manage exact-name Herdr Agents"
 requires-python = ">=3.14"
-dependencies = ["herdr-runtime"]
+dependencies = ["herdr-runtime", "herdr-task-state"]
 
 [project.scripts]
 herdr-agents = "herdr_agents.persistent.cli:main"
@@ -20,6 +20,7 @@ dev = [
 
 [tool.uv.sources]
 herdr-runtime = { path = "../herdr_runtime" }
+herdr-task-state = { path = "../herdr_task_state" }
 
 [tool.setuptools]
 package-dir = {"" = "src"}

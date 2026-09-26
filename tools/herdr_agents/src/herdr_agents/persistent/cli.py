@@ -7,7 +7,10 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from herdr_runtime import AgentInfo, HerdrClient, HerdrRuntimeError, PaneInfo, SubprocessRunner
+from herdr_task_state.store import StateStore
 
+from ..bindings import resolve_git_binding
+from ..codex_sessions import CodexSessionFiles
 from ..errors import AgentManagementError
 from ..service import AgentManager, AgentOperations
 from .config import AgentDefinition, load_agent_definitions
@@ -30,6 +33,12 @@ def _default_config() -> Path:
     return Path(os.environ.get("HERDR_AGENT_CONFIG", ".config/herdr/agents.toml"))
 
 
+def _default_state_path() -> Path:
+    state_home = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    default = state_home / "ai-agent-home" / "herdr-tasks.json"
+    return Path(os.environ.get("HERDR_TASK_STATE_FILE", default))
+
+
 def _result_document(result: AgentReconcileResult) -> str:
     return json.dumps(
         {
@@ -42,16 +51,24 @@ def _result_document(result: AgentReconcileResult) -> str:
 
 
 def _run(args: argparse.Namespace) -> int:
-    herdr = HerdrClient(SubprocessRunner(), os.environ.get("HERDR_BIN", "herdr"))
+    runner = SubprocessRunner()
+    herdr = HerdrClient(runner, os.environ.get("HERDR_BIN", "herdr"))
+    state = StateStore(_default_state_path())
+    state.init()
     result = reconcile(
         args.config,
-        AgentManager(herdr.agent),
+        AgentManager(
+            herdr.agent,
+            state,
+            CodexSessionFiles(Path.home() / ".codex" / "session_index.jsonl"),
+        ),
         herdr.agent,
         lambda item, existing: resolve_pane(
             item,
             herdr,
             None if existing is None else existing.pane_id,
         ),
+        lambda cwd: resolve_git_binding(cwd, runner),
     )
     print(_result_document(result))
     return 1 if result.failed else 0
