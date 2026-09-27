@@ -33,6 +33,7 @@ class AgentInfo:
     pane_id: str
     workspace_id: str
     cwd: Path
+    agent_session_id: str | None = None
 
 
 @dataclass(frozen=True)

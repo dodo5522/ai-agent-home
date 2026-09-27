@@ -3,7 +3,8 @@ from pathlib import Path
 
 from herdr_runtime import AgentInfo, HerdrError, PaneInfo
 
-from herdr_agents import AgentManager
+from herdr_agents import AgentManager, AgentTarget, EnsuredAgent
+from herdr_agents.bindings import GitBinding
 from herdr_agents.persistent.config import AgentDefinition
 from herdr_agents.persistent.reconciler import AgentReconciler, AgentReconcileResult
 
@@ -66,3 +67,29 @@ def test_failed_definition_does_not_prevent_later_start() -> None:
     assert result.started == ("codex-review",)
     assert result.failed == (("codex-main", "start failed for codex-main"),)
     assert herdr.starts == ["codex-main", "codex-review"]
+
+
+def test_persistent_reconciliation_uses_complete_git_binding() -> None:
+    targets: list[AgentTarget] = []
+
+    class RecordingManager:
+        def ensure(self, target: AgentTarget) -> EnsuredAgent:
+            targets.append(target)
+            return EnsuredAgent(
+                AgentInfo(
+                    target.name, "codex", target.pane_id, target.workspace_id, target.cwd
+                ),
+                "fresh",
+            )
+
+    result = AgentReconciler(
+        RecordingManager(),
+        FakeHerdr(),
+        resolve,
+        lambda cwd: GitBinding("owner/repo", "feat/persistent"),
+    ).reconcile([definition("codex-main", "/work/main")])
+
+    assert result.started == ("codex-main",)
+    assert targets[0].binding().repository == "owner/repo"
+    assert targets[0].binding().workspace_label == "owner/repo"
+    assert targets[0].binding().branch == "feat/persistent"

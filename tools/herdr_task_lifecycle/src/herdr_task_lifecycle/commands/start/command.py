@@ -4,7 +4,9 @@ import argparse
 from pathlib import Path
 
 from herdr_agents import AgentManager
+from herdr_agents.codex_sessions import CodexSessionFiles
 from herdr_runtime import HerdrClient, SubprocessRunner
+from herdr_task_state.store import StateStore
 
 from ...errors import ExitCode
 from ...state import state_path
@@ -26,11 +28,20 @@ def _run(args: argparse.Namespace) -> int:
     cwd = args.cwd.expanduser().resolve()
     runner = SubprocessRunner()
     herdr = HerdrClient(runner)
+    path = state_path()
+    state = StateStore(path)
+    state.init()
     resolution = TaskStarter(
-        state_path(),
+        path,
         runner=runner,
         herdr=herdr,
-        agent_starter=TaskAgentStarter(AgentManager(herdr.agent)),
+        agent_starter=TaskAgentStarter(
+            AgentManager(
+                herdr.agent,
+                state,
+                CodexSessionFiles(Path.home() / ".codex" / "session_index.jsonl"),
+            )
+        ),
     ).start(args.issue_number, cwd)
     print(resolution.task.to_json())
     return ExitCode.SUCCESS

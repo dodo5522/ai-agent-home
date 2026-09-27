@@ -7,6 +7,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import (
     AfterValidator,
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -107,9 +108,12 @@ class AgentReference(Model):
     """Reference data for an agent associated with a workstream."""
 
     name: NonEmptyString
-    codex_session_id: NonEmptyString | None = None
+    agent_session_id: NonEmptyString | None = Field(
+        default=None,
+        validation_alias=AliasChoices("agent_session_id", "codex_session_id"),
+    )
 
-    @field_validator("codex_session_id", mode="before")
+    @field_validator("agent_session_id", mode="before")
     @classmethod
     def reject_null_session_id(cls, value: str | None) -> str | None:
         if value is None:
@@ -275,16 +279,51 @@ class Task(Model):
         return task
 
 
+class PersistentAgentReference(Model):
+    """Session and placement mapping for a non-Issue managed Agent."""
+
+    agent_session_id: NonEmptyString = Field(
+        validation_alias=AliasChoices("agent_session_id", "codex_session_id")
+    )
+    repository: RepositoryName
+    workspace_id: NonEmptyString
+    workspace_label: NonEmptyString
+    worktree: AbsolutePath
+    branch: NonEmptyString
+    pane_id: NonEmptyString
+
+
 class TaskState(Model):
     """Versioned collection of validated tasks keyed by stable task identifiers."""
 
-    version: Annotated[StrictInt, Field(ge=1, le=1)]
+    version: Annotated[StrictInt, Field(ge=1, le=2)]
     tasks: dict[str, Task]
+    persistent_agents: dict[NonEmptyString, PersistentAgentReference] | None = None
 
     @model_validator(mode="after")
     def validate_task_identities(self) -> Self:
+        if self.version == 2 and self.persistent_agents is None:
+            raise ValueError("persistent_agents is required for version 2")
+        names: set[str] = set()
+        session_ids: set[str] = set()
         for task_key, task in self.tasks.items():
             task.assert_matches(TaskKey.parse(task_key))
+            for workstream in task.workstreams.values():
+                for agent in (workstream.agents or {}).values():
+                    if agent.name in names:
+                        raise ValueError("Agent name must be unique")
+                    names.add(agent.name)
+                    if agent.agent_session_id is not None:
+                        if agent.agent_session_id in session_ids:
+                            raise ValueError("Codex session ID must be unique")
+                        session_ids.add(agent.agent_session_id)
+        for name, agent in (self.persistent_agents or {}).items():
+            if name in names:
+                raise ValueError("Agent name must be unique")
+            names.add(name)
+            if agent.agent_session_id in session_ids:
+                raise ValueError("Codex session ID must be unique")
+            session_ids.add(agent.agent_session_id)
         return self
 
     @classmethod
@@ -312,15 +351,27 @@ class TaskState(Model):
         return self.model_copy(update={"tasks": remaining})
 
 
+def migrate_state(document: TaskState) -> TaskState:
+    """Return a validated version 2 document preserving unknown fields."""
+    if document.version == 2:
+        return document
+    payload = document.model_dump(mode="python", by_alias=False, exclude_unset=True)
+    payload["version"] = 2
+    payload["persistent_agents"] = {}
+    return TaskState.model_validate(payload)
+
+
 __all__ = [
     "AgentReference",
     "CleanupAction",
     "CleanupProgress",
     "HerdrReference",
     "Model",
+    "PersistentAgentReference",
     "StateValidationError",
     "Task",
     "TaskKey",
     "TaskState",
     "Workstream",
+    "migrate_state",
 ]

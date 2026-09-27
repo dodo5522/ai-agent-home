@@ -679,9 +679,9 @@ def test_failed_task_agent_start_keeps_resources_for_retry(start_fixture: StartF
     with pytest.raises(LifecycleError, match="Agent start"):
         start_fixture.run(32, agent_starter=agent_starter)
 
-    assert (
-        start_fixture.state().tasks["dodo5522/ai-agent-home#32"].workstreams["main"].agents is None
-    )
+    assert start_fixture.state().tasks["dodo5522/ai-agent-home#32"].workstreams["main"].agents == {
+        "implementer": AgentReference(name="codex-issue-32-0e555c32")
+    }
     assert not start_fixture.herdr.was_called("workspace", "close", "w9")
 
 
@@ -983,3 +983,12 @@ def test_start_cli_maps_missing_herdr_environment_to_runtime_error(
 
     assert lifecycle_main(["start", "32", "--cwd", str(tmp_path)]) == 1
     assert "HERDR_ENV" in capsys.readouterr().err
+
+
+def test_start_migrates_v1_before_recording_agent(start_fixture: StartFixture) -> None:
+    start_fixture.write_state_with_ids("w9", "w9:t2", "w9:p3", tab_label="32 Herdr task-start")
+    start_fixture.make_managed_tab("w9", "w9:t2", "w9:p3", "32 Herdr task-start")
+
+    start_fixture.run(32)
+
+    assert json.loads(start_fixture.state_path.read_text(encoding="utf-8"))["version"] == 2

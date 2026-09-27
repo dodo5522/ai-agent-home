@@ -144,3 +144,17 @@ def test_concurrent_puts_preserve_every_task(
     assert all(process.returncode == 0 for process in processes), results
     state = json.loads(Path(cli_env["HERDR_TASK_STATE_FILE"]).read_text())
     assert set(state["tasks"]) == {f"dodo5522/ai-agent-home#{n}" for n in range(10, 20)}
+
+
+def test_session_list_is_read_only(
+    invoke: Callable[..., subprocess.CompletedProcess[str]], cli_env: dict[str, str]
+) -> None:
+    assert invoke("init").returncode == 0
+    path = Path(cli_env["HERDR_TASK_STATE_FILE"])
+    before = path.read_bytes()
+
+    result = invoke("session", "list")
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == []
+    assert path.read_bytes() == before

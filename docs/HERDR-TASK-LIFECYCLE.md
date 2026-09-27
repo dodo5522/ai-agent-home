@@ -63,7 +63,7 @@ Target sequence:
 | Task resources | `start` validates an already-created non-primary worktree, records task resources, and creates/reuses the repository Workspace and Issue Tab. | It does not create the Git worktree. Coordinator resource provisioning and persistent Workspace reuse need integration under #30/#11. Never adopt a label-only unmanaged Workspace. |
 | Issue implementer | `start` starts/reuses a task-unique Agent, validates its Pane/cwd, sends initial instructions, and persists its reference. | End-to-end coordinator handoff and completion reporting remain to be exercised; #9 tests use fakes, not a live two-Issue workflow. |
 | Issue reviewer | Role-keyed state can represent Agents; role Pane commands are reserved. | #12 owns review behavior/results; #30 coordinates role Pane creation and task-scoped identities. No reviewer allocation or shared-worker queue exists. |
-| Session recovery | Agent names are recorded. | #10 owns exact session mapping/resume; restarting an Agent is not session restoration. |
+| Session recovery | Exact Codex session IDs and bindings are recorded and restored after restart. | Local session files, exact binding validation, and live Herdr identity must agree; stale sessions start fresh only after their own mapping is cleared. |
 | PR lifecycle and cleanup | Guarded cleanup exists; PR/review retention rules are documented. | PR metadata command is reserved. Integration must preserve the coordinator and other Issues, including when the final Issue mapping is removed (#30). |
 
 Next implementer: read #9, #10, #12 and #30 together. Keep this document as the
@@ -171,11 +171,12 @@ preserves previously managed resources. Read-only `herdr-task-state`
 operations never create Herdr resources.
 
 After the Workspace, Tab, and root Pane are persisted, `start` reconciles the
-Issue implementer Agent by exact managed Agent name and sends its initial
-instruction to that exact Agent. A repeated start does not create a duplicate
-Agent or send a duplicate initial instruction. If Agent startup fails, the
-Workspace, Tab, Pane, and task mapping remain available for retry; the command
-does not close state-owned resources as a rollback side effect.
+Issue implementer Agent by exact managed Agent name and records its observed
+Codex session ID. It sends the initial instruction only to a fresh session; a
+live or exactly resumed session receives no duplicate prompt. A repeated start
+does not create a duplicate Agent. If Agent startup fails, the Workspace, Tab,
+Pane, and task mapping remain available for retry; the command does not close
+state-owned resources as a rollback side effect.
 
 ## Managing multiple Agents
 
@@ -211,10 +212,15 @@ than selected by focus, display order, or fixed IDs. A missing configuration
 file safely reconciles no bootstrap Agents.
 
 Each Agent is reconciled independently; one failed Agent does not restart or
-invalidate another live Agent.
+invalidate another live Agent. Reconciliation derives the GitHub repository
+and attached branch from each configured worktree, then requires an exact
+match with the stored repository, Workspace, worktree, branch, Pane, and
+Agent name before resuming its stored Codex session. A missing or malformed
+local session clears only that mapping and starts a fresh session; a binding
+mismatch is reported without reuse or replacement.
 
 Issue #9 owns Agent naming, startup, duplicate prevention, and individual
-recovery. Codex session discovery and resume belong to Issue #10. Model
+recovery. Issue #10 owns exact Codex session discovery and resume. Model
 selection and complexity-based model/sub-agent routing belong to Issue #44;
 #9 does not assume that Codex automatically selects a model from task
 complexity.

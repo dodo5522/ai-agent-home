@@ -26,10 +26,14 @@ version = "0.1.0"
 source = { directory = "../herdr_agents" }
 dependencies = [
     { name = "herdr-runtime" },
+    { name = "herdr-task-state" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "herdr-runtime", directory = "../herdr_runtime" }]
+requires-dist = [
+    { name = "herdr-runtime", directory = "../herdr_runtime" },
+    { name = "herdr-task-state", directory = "../herdr_task_state" },
+]
 
 [package.metadata.requires-dev]
 dev = [
