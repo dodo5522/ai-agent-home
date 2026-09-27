@@ -5,3 +5,6 @@
 **/.venv/
 **/build/
 .config/herdr/agents.toml
+
+# Disposable implementation plans; retain design specifications under docs/superpowers/specs/.
+docs/superpowers/plans/

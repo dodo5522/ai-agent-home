@@ -13,14 +13,17 @@ When making changes in this repository:
 
 ## Documentation review
 
-When asking the user to review a design document, implementation plan, or other
-repository documentation that was created or updated during the task:
+When asking the user to review a design document or other repository
+documentation that was created or updated during the task:
 
 - Commit the document changes first.
 - Push the feature branch to `origin`.
 - Confirm that the local branch and its remote-tracking branch contain the same
   commit.
 - Only then ask the user to review the document.
+
+Implementation plans are disposable task artifacts. Keep them outside Git;
+retain durable design specifications and operator documentation in Git.
 
 ## Pull Request updates
 
