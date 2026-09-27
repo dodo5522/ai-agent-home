@@ -202,9 +202,9 @@ class StateStore:
                     workstream.branch,
                     pane_id,
                 )
-                if agent.codex_session_id is None:
+                if agent.agent_session_id is None:
                     return None
-                return SessionMapping(target, agent.codex_session_id)
+                return SessionMapping(target, agent.agent_session_id)
         return None
 
     @staticmethod
@@ -222,7 +222,7 @@ class StateStore:
             agent.branch,
             agent.pane_id,
         )
-        return SessionMapping(binding, agent.codex_session_id)
+        return SessionMapping(binding, agent.agent_session_id)
 
     def find_session(self, name: str) -> SessionMapping | None:
         """Return the exact stored session mapping without mutating state."""
@@ -273,7 +273,7 @@ class StateStore:
                         )
                         if not self._matches(expected, binding):
                             raise StateValidationError("Agent binding does not match state")
-                        updated_agent = AgentReference(name=agent.name, codex_session_id=session_id)
+                        updated_agent = AgentReference(name=agent.name, agent_session_id=session_id)
                         updated_agents = {**(workstream.agents or {}), role: updated_agent}
                         updated_workstream = workstream.model_copy(
                             update={"agents": updated_agents}
@@ -299,7 +299,7 @@ class StateStore:
                 raise StateValidationError("Agent binding does not match state")
             records = dict(current.persistent_agents or {})
             records[binding.name] = PersistentAgentReference(
-                codex_session_id=session_id,
+                agent_session_id=session_id,
                 repository=binding.repository,
                 workspace_id=binding.workspace_id,
                 workspace_label=binding.workspace_label,

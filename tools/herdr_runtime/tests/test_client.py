@@ -81,7 +81,7 @@ def test_agent_start_targets_explicit_pane() -> None:
     assert runner.calls == [command]
 
 
-def test_agent_decodes_codex_session_id() -> None:
+def test_agent_decodes_agent_session_id() -> None:
     command = ("herdr", "agent", "list")
     runner = RecordingRunner(
         {
@@ -105,7 +105,7 @@ def test_agent_decodes_codex_session_id() -> None:
     agent = HerdrClient(runner).agent.find("codex-main")
 
     assert agent is not None
-    assert agent.codex_session_id == "session-a"
+    assert agent.agent_session_id == "session-a"
 
 
 def test_agent_start_passes_exact_resume_id() -> None:

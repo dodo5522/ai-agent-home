@@ -180,5 +180,5 @@ def test_resume_error_accepts_only_exact_live_recovery() -> None:
     result = AgentManager(herdr, state, FakeInspector(True)).ensure(mapped_target())
 
     assert result.disposition == "resumed"
-    assert result.agent.codex_session_id == "session-a"
+    assert result.agent.agent_session_id == "session-a"
     assert herdr.start_arguments == [("resume", "session-a")]

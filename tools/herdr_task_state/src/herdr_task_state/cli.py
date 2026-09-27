@@ -165,7 +165,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         [
                             {
                                 "name": item.binding.name,
-                                "codex_session_id": item.session_id,
+                                "agent_session_id": item.session_id,
                                 "repository": item.binding.repository,
                                 "workspace_id": item.binding.workspace_id,
                                 "workspace_label": item.binding.workspace_label,

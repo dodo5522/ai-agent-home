@@ -121,12 +121,12 @@ class AgentManager:
                 if recovered is None:
                     raise
                 self._validate(recovered, target)
-                if recovered.codex_session_id != mapping.session_id:
+                if recovered.agent_session_id != mapping.session_id:
                     raise AgentManagementError("Resumed Agent has a different Codex session")
                 self._record(target, recovered)
                 return EnsuredAgent(recovered, "resumed")
             self._validate(started, target)
-            if started.codex_session_id != mapping.session_id:
+            if started.agent_session_id != mapping.session_id:
                 raise AgentManagementError("Resumed Agent has a different Codex session")
             self._record(target, started)
             return EnsuredAgent(started, "resumed")
@@ -138,9 +138,9 @@ class AgentManager:
     def _record(self, target: AgentTarget, agent: AgentInfo) -> None:
         if self._sessions is None:
             return
-        if agent.codex_session_id is None:
+        if agent.agent_session_id is None:
             raise AgentManagementError("Codex Agent has no session identity")
-        self._sessions.record_session(target.binding(), agent.codex_session_id)
+        self._sessions.record_session(target.binding(), agent.agent_session_id)
 
     def prompt(self, name: str, text: str) -> None:
         """Send text to one exact managed Agent name."""

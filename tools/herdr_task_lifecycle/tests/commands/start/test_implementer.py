@@ -64,7 +64,7 @@ def test_new_agent_uses_exact_target_and_receives_initial_prompt() -> None:
 
     reference = TaskAgentStarter(manager).ensure_implementer(key, current, "w16:p2")
 
-    assert reference == AgentReference(name=task_agent_name(key), codex_session_id="session-a")
+    assert reference == AgentReference(name=task_agent_name(key), agent_session_id="session-a")
     assert manager.targets == [
         AgentTarget(
             task_agent_name(key),
@@ -87,7 +87,7 @@ def test_resumed_agent_does_not_receive_duplicate_prompt() -> None:
 
     reference = TaskAgentStarter(manager).ensure_implementer(key, current, "w16:p2")
 
-    assert reference == AgentReference(name="codex-issue-9-stored", codex_session_id="session-a")
+    assert reference == AgentReference(name="codex-issue-9-stored", agent_session_id="session-a")
     assert manager.prompts == []
 
 

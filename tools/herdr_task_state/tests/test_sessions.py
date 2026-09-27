@@ -43,7 +43,7 @@ def write_state(tmp_path: Path) -> Path:
                 },
                 "persistent_agents": {
                     "codex-coordinator": {
-                        "codex_session_id": "session-b",
+                        "agent_session_id": "session-b",
                         "repository": "dodo5522/ai-agent-home",
                         "workspace_id": "w1",
                         "workspace_label": "dodo5522/ai-agent-home",

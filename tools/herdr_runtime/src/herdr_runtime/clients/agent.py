@@ -32,7 +32,7 @@ class AgentClient:
             pane_id=required_string(agent, "pane_id"),
             workspace_id=required_string(agent, "workspace_id"),
             cwd=Path(required_string(agent, "cwd")),
-            codex_session_id=session_id,
+            agent_session_id=session_id,
         )
 
     def list(self) -> list[AgentInfo]:

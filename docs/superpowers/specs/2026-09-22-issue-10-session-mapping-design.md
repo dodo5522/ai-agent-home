@@ -29,14 +29,14 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/ai-agent-home/herdr-tasks.json
 ```
 
 Issue Agents use the existing optional field at
-`tasks.<task-key>.workstreams.<workstream>.agents.<role>.codex_session_id`.
+`tasks.<task-key>.workstreams.<workstream>.agents.<role>.agent_session_id`.
 Their repository, Workspace, worktree, branch, Pane, and Agent bindings already
 exist in surrounding objects and are not duplicated.
 
 Persistent Agents have no Issue task. Version 2 adds a required top-level
 `persistent_agents` map keyed by exact managed Agent name; the map may be empty.
 Each value contains
-the non-empty `codex_session_id`, normalized `repository`, `workspace_id`,
+the non-empty `agent_session_id`, normalized `repository`, `workspace_id`,
 `workspace_label`, resolved absolute `worktree`, attached `branch`, and the last
 validated `pane_id`.
 
@@ -59,7 +59,7 @@ validated `pane_id`.
           "agents": {
             "implementer": {
               "name": "codex-issue-10-0e555c32",
-              "codex_session_id": "01a0c85f-f7a4-7ca3-9b4b-6c1e2f02fd4a"
+              "agent_session_id": "01a0c85f-f7a4-7ca3-9b4b-6c1e2f02fd4a"
             }
           }
         }
@@ -68,7 +68,7 @@ validated `pane_id`.
   },
   "persistent_agents": {
     "codex-coordinator": {
-      "codex_session_id": "01b10000-0000-7000-8000-000000000000",
+      "agent_session_id": "01b10000-0000-7000-8000-000000000000",
       "repository": "dodo5522/ai-agent-home",
       "workspace_id": "w1",
       "workspace_label": "dodo5522/ai-agent-home",
@@ -121,7 +121,7 @@ The model validates mappings across both locations:
 `herdr_task_state` gains lock-scoped operations to find an Agent by exact name,
 compare its binding, update its observed session, or remove its mapping without
 overwriting unrelated state. Updating an Issue Agent changes only
-`codex_session_id`; removal retains the Agent name and task resources. Removing
+`agent_session_id`; removal retains the Agent name and task resources. Removing
 a persistent mapping removes its `persistent_agents` entry because its binding
 is reconstructed from configuration and validated live resources.
 

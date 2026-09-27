@@ -7,6 +7,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import (
     AfterValidator,
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -107,9 +108,12 @@ class AgentReference(Model):
     """Reference data for an agent associated with a workstream."""
 
     name: NonEmptyString
-    codex_session_id: NonEmptyString | None = None
+    agent_session_id: NonEmptyString | None = Field(
+        default=None,
+        validation_alias=AliasChoices("agent_session_id", "codex_session_id"),
+    )
 
-    @field_validator("codex_session_id", mode="before")
+    @field_validator("agent_session_id", mode="before")
     @classmethod
     def reject_null_session_id(cls, value: str | None) -> str | None:
         if value is None:
@@ -278,7 +282,9 @@ class Task(Model):
 class PersistentAgentReference(Model):
     """Session and placement mapping for a non-Issue managed Agent."""
 
-    codex_session_id: NonEmptyString
+    agent_session_id: NonEmptyString = Field(
+        validation_alias=AliasChoices("agent_session_id", "codex_session_id")
+    )
     repository: RepositoryName
     workspace_id: NonEmptyString
     workspace_label: NonEmptyString
@@ -307,17 +313,17 @@ class TaskState(Model):
                     if agent.name in names:
                         raise ValueError("Agent name must be unique")
                     names.add(agent.name)
-                    if agent.codex_session_id is not None:
-                        if agent.codex_session_id in session_ids:
+                    if agent.agent_session_id is not None:
+                        if agent.agent_session_id in session_ids:
                             raise ValueError("Codex session ID must be unique")
-                        session_ids.add(agent.codex_session_id)
+                        session_ids.add(agent.agent_session_id)
         for name, agent in (self.persistent_agents or {}).items():
             if name in names:
                 raise ValueError("Agent name must be unique")
             names.add(name)
-            if agent.codex_session_id in session_ids:
+            if agent.agent_session_id in session_ids:
                 raise ValueError("Codex session ID must be unique")
-            session_ids.add(agent.codex_session_id)
+            session_ids.add(agent.agent_session_id)
         return self
 
     @classmethod

@@ -83,7 +83,7 @@ Expected: FAIL because version 2 and global ownership validation do not exist.
 
 ~~~python
 class PersistentAgentReference(Model):
-    codex_session_id: NonEmptyString
+    agent_session_id: NonEmptyString
     repository: RepositoryName
     workspace_id: NonEmptyString
     workspace_label: NonEmptyString
@@ -258,7 +258,7 @@ class AgentInfo:
     pane_id: str
     workspace_id: str
     cwd: Path
-    codex_session_id: str | None = None
+    agent_session_id: str | None = None
 
 def start(
     self, name: str, pane_id: str, kind: str = "codex", native_args: Sequence[str] = ()
@@ -268,10 +268,10 @@ def start(
 - [ ] **Step 1: Write failing runtime tests**
 
 ~~~python
-def test_agent_decodes_codex_session_id() -> None:
+def test_agent_decodes_agent_session_id() -> None:
     agent = HerdrClient(runner_with_agent_session("session-a")).agent.find("codex-main")
     assert agent is not None
-    assert agent.codex_session_id == "session-a"
+    assert agent.agent_session_id == "session-a"
 
 def test_start_passes_exact_resume_id() -> None:
     HerdrClient(runner).agent.start("codex-main", "w1:p1", native_args=("resume", "session-a"))
@@ -408,20 +408,20 @@ git commit -m "feat: resume managed Codex sessions exactly" -m "Generated-by: Co
 
 **Interfaces:**
 
-- Consumes `EnsuredAgent.disposition` and `AgentInfo.codex_session_id`.
-- Produces `AgentReference(name=..., codex_session_id=...)`.
+- Consumes `EnsuredAgent.disposition` and `AgentInfo.agent_session_id`.
+- Produces `AgentReference(name=..., agent_session_id=...)`.
 
 - [ ] **Step 1: Write failing Issue Agent tests**
 
 ~~~python
 def test_fresh_implementer_records_session_and_prompts() -> None:
     reference = TaskAgentStarter(manager).ensure_implementer(key, task, "w16:p2")
-    assert reference == AgentReference(name=task_agent_name(key), codex_session_id="session-a")
+    assert reference == AgentReference(name=task_agent_name(key), agent_session_id="session-a")
     assert len(manager.prompts) == 1
 
 def test_resumed_implementer_does_not_receive_duplicate_prompt() -> None:
     reference = TaskAgentStarter(resumed_manager).ensure_implementer(key, stored_task, "w16:p2")
-    assert reference.codex_session_id == "session-a"
+    assert reference.agent_session_id == "session-a"
     assert resumed_manager.prompts == []
 ~~~
 
@@ -433,7 +433,7 @@ Expected: FAIL because Issue startup currently discards observed IDs and does no
 
 - [ ] **Step 3: Preserve session and create full Issue binding**
 
-Construct `AgentTarget` from task key, `task.herdr`, main worktree, branch, and Pane. Require `result.agent.codex_session_id`; return it in `AgentReference`. Send the initial Issue prompt only for `disposition == "fresh"`. Initialize a new lifecycle state as `TaskState(version=2, tasks={}, persistent_agents={})`.
+Construct `AgentTarget` from task key, `task.herdr`, main worktree, branch, and Pane. Require `result.agent.agent_session_id`; return it in `AgentReference`. Send the initial Issue prompt only for `disposition == "fresh"`. Initialize a new lifecycle state as `TaskState(version=2, tasks={}, persistent_agents={})`.
 
 - [ ] **Step 4: Add migration coverage**
 

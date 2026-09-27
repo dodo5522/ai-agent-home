@@ -391,7 +391,7 @@ def test_rejects_session_owned_by_issue_and_persistent_agent() -> None:
                         "branch": "feat/issue-30",
                         "pane_ids": {"root": "w1:p1"},
                         "agents": {
-                            "implementer": {"name": "codex-issue-30", "codex_session_id": "same"}
+                            "implementer": {"name": "codex-issue-30", "agent_session_id": "same"}
                         },
                     }
                 },
@@ -399,7 +399,7 @@ def test_rejects_session_owned_by_issue_and_persistent_agent() -> None:
         },
         "persistent_agents": {
             "codex-coordinator": {
-                "codex_session_id": "same",
+                "agent_session_id": "same",
                 "repository": "dodo5522/ai-agent-home",
                 "workspace_id": "w1",
                 "workspace_label": "dodo5522/ai-agent-home",
@@ -412,3 +412,15 @@ def test_rejects_session_owned_by_issue_and_persistent_agent() -> None:
 
     with pytest.raises(StateValidationError, match="session ID"):
         TaskState.parse(json.dumps(payload))
+
+
+def test_legacy_codex_session_key_is_read_as_generic_agent_session_id() -> None:
+    document = TaskState.parse(
+        '{"version":2,"tasks":{},"persistent_agents":{"codex-main":'
+        '{"codex_session_id":"session-a","repository":"owner/repo",'
+        '"workspace_id":"w1","workspace_label":"owner/repo",'
+        '"worktree":"/work/repo","branch":"main","pane_id":"w1:p1"}}}'
+    )
+
+    assert document.persistent_agents["codex-main"].agent_session_id == "session-a"
+    assert "codex_session_id" not in document.to_json()
