@@ -5,10 +5,24 @@ import pytest
 from herdr_runtime import AgentInfo, PaneInfo, WorkspaceInfo
 
 from herdr_agents import AgentManagementError, AgentManager
-from herdr_agents.persistent.cli import reconcile
+from herdr_agents.persistent.cli import _default_config, reconcile
 from herdr_agents.persistent.config import AgentDefinition
 from herdr_agents.persistent.reconciler import AgentReconcileResult
 from herdr_agents.persistent.resolver import resolve_pane
+
+
+def test_default_config_uses_ai_agent_home_xdg_namespace(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HERDR_AGENT_CONFIG", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/custom/config")
+
+    assert _default_config() == Path("/custom/config/ai-agent-home/agents.toml")
+
+
+def test_agent_config_override_takes_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/custom/config")
+    monkeypatch.setenv("HERDR_AGENT_CONFIG", "/tmp/agents.toml")
+
+    assert _default_config() == Path("/tmp/agents.toml")
 
 
 @dataclass

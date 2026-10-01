@@ -180,12 +180,13 @@ state-owned resources as a rollback side effect.
 
 ## Managing multiple Agents
 
-Long-lived managed Agents are declared in `.config/herdr/agents.toml`. Start by
-copying `.config/herdr/agents.toml.example`; the actual file is intentionally
-ignored by Git because each machine has its own absolute `cwd`:
+Long-lived managed Agents are declared in `.config/ai-agent-home/agents.toml`. Start by
+copying `.config/ai-agent-home/agents.toml.example`; the actual file is intentionally
+ignored by Git because each machine has its own absolute `cwd`. This is ai-agent-home
+tooling configuration; `.config/herdr/` belongs to Herdr itself:
 
 ```bash
-cp .config/herdr/agents.toml.example .config/herdr/agents.toml
+cp .config/ai-agent-home/agents.toml.example .config/ai-agent-home/agents.toml
 ```
 
 Example definition:
@@ -201,7 +202,7 @@ cwd = "/home/takashi"
 Reconcile them with:
 
 ```bash
-herdr-agents reconcile --config .config/herdr/agents.toml
+herdr-agents reconcile --config .config/ai-agent-home/agents.toml
 ```
 
 The reconciler matches exact Agent names. A live `codex` Agent does not satisfy

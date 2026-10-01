@@ -19,11 +19,11 @@ rg -q 'non-primary Git worktree' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'worktree.*branch' docs/HERDR-TASK-LIFECYCLE.md
 rg -q '#<issue-number> <short-title>' docs/HERDR-TASK-LIFECYCLE.md
 rg -q 'herdr-agents reconcile' docs/HERDR-TASK-LIFECYCLE.md README.md
-rg -q '\.config/herdr/agents\.toml' docs/HERDR-TASK-LIFECYCLE.md README.md
-test -f .config/herdr/agents.toml.example
+rg -q '\.config/ai-agent-home/agents\.toml' docs/HERDR-TASK-LIFECYCLE.md README.md
+test -f .config/ai-agent-home/agents.toml.example
 rg -q 'agents\.toml\.example' README.md docs/HERDR-TASK-LIFECYCLE.md
-rg -q '^\.config/herdr/agents\.toml$' .gitignore
-git check-ignore -q .config/herdr/agents.toml
+rg -q '^\.config/ai-agent-home/agents\.toml$' .gitignore
+git check-ignore -q .config/ai-agent-home/agents.toml
 rg -q 'herdr-agents.*path = "../herdr_agents"' tools/herdr_task_lifecycle/pyproject.toml
 rg -q 'herdr-runtime.*path = "../herdr_runtime"' tools/herdr_task_lifecycle/pyproject.toml
 ! rg -q '^herdr-agents[[:space:]]*=' tools/herdr_task_lifecycle/pyproject.toml

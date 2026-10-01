@@ -103,8 +103,9 @@ journalctl --user -u herdr.service -u herdr-agents.service -b --no-pager
 ## 復旧ロジック
 
 1. Herdr server が running / compatible になるまで最大120秒待機
-2. `.config/herdr/agents.toml` の定義を読み込む（初回は
-   `.config/herdr/agents.toml.example` をコピーして作成）
+2. `.config/ai-agent-home/agents.toml` の定義を読み込む（初回は
+   `.config/ai-agent-home/agents.toml.example` をコピーして作成）。これは
+   ai-agent-home tooling の設定であり、Herdr 自身の設定は `.config/herdr/` に属する
 3. 独立した `tools/herdr_agents` の `herdr-agents reconcile` を実行する
 4. Agent 名を完全一致で live Agent 一覧と照合する
 5. 不在 Agent だけを Workspace/cwd に一致する明示 Pane で起動する
