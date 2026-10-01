@@ -136,6 +136,10 @@ test_herdr_agent_bootstrap_reconciles_named_agents() {
         "Herdr bootstrap delegates to named-Agent reconciliation"
     assert_contains "$bootstrap" 'HERDR_AGENT_CONFIG' \
         "Herdr bootstrap passes the Agent configuration path"
+    assert_contains "$bootstrap" 'XDG_CONFIG_HOME' \
+        "Herdr bootstrap uses the XDG configuration home"
+    assert_contains "$bootstrap" 'ai-agent-home/agents.toml' \
+        "Herdr bootstrap uses the ai-agent-home Agent configuration namespace"
     assert_contains "$agent_wrapper" 'tools/herdr_agents' \
         "Herdr Agent wrapper uses the independent Agent project"
     if [[ -x $HERDR_AGENTS_CLI && -f $HERDR_AGENTS_PROJECT && -f $HERDR_RUNTIME_PROJECT ]]; then
