@@ -30,9 +30,9 @@ def reconcile(
 
 
 def _default_config() -> Path:
-    config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     default = config_home / "ai-agent-home" / "agents.toml"
-    return Path(os.environ.get("HERDR_AGENT_CONFIG", default))
+    return Path(os.environ.get("HERDR_AGENT_CONFIG") or default)
 
 
 def _default_state_path() -> Path:

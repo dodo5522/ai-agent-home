@@ -25,6 +25,15 @@ def test_agent_config_override_takes_precedence(monkeypatch: pytest.MonkeyPatch)
     assert _default_config() == Path("/tmp/agents.toml")
 
 
+def test_empty_config_environment_values_use_the_xdg_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", "")
+    monkeypatch.setenv("HERDR_AGENT_CONFIG", "")
+
+    assert _default_config() == Path.home() / ".config/ai-agent-home/agents.toml"
+
+
 @dataclass
 class FakeWorkspaceClient:
     owner: FakeHerdr
