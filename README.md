@@ -130,17 +130,18 @@ bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 実装済み機能と残件は[引き継ぎ表](docs/HERDR-TASK-LIFECYCLE.md#target-operation-and-implementation-handoff)
 を参照してください。常設Agentを複数Issueの共有ワーカーとしては扱いません。
 
-長期 Agent の定義は、まず `.config/herdr/agents.toml.example` を
-`.config/herdr/agents.toml` にコピーしてから、ローカル環境に合わせて設定します。
-実設定は `cwd` が環境依存のためGit管理外です。Agentは名前単位で冪等に
+長期 Agent の定義は、まず `.config/ai-agent-home/agents.toml.example` を
+`.config/ai-agent-home/agents.toml` にコピーしてから、ローカル環境に合わせて設定します。
+実設定は `cwd` が環境依存のためGit管理外です。これは ai-agent-home tooling の設定であり、
+Herdr 自身の設定が属する `.config/herdr/` とは分離されます。Agentは名前単位で冪等に
 reconcile されます。
 
 ```bash
-cp .config/herdr/agents.toml.example .config/herdr/agents.toml
+cp .config/ai-agent-home/agents.toml.example .config/ai-agent-home/agents.toml
 ```
 
 ```bash
-herdr-agents reconcile --config .config/herdr/agents.toml
+herdr-agents reconcile --config .config/ai-agent-home/agents.toml
 ```
 
 `herdr-task start` は Issue の root Pane に implementer Agent を起動・再利用します。

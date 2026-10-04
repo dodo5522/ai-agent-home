@@ -3,7 +3,7 @@ set -euo pipefail
 
 HERDR_BIN=${HERDR_BIN:-/home/takashi/.local/share/mise/shims/herdr}
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-HERDR_AGENT_CONFIG=${HERDR_AGENT_CONFIG:-${WORKSPACE_CWD:-/home/takashi}/.config/herdr/agents.toml}
+HERDR_AGENT_CONFIG=${HERDR_AGENT_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/ai-agent-home/agents.toml}
 LOCK_FILE=${LOCK_FILE:-${XDG_RUNTIME_DIR:-/tmp}/herdr-agents.lock}
 SERVER_WAIT_ATTEMPTS=${SERVER_WAIT_ATTEMPTS:-60}
 SERVER_WAIT_INTERVAL=${SERVER_WAIT_INTERVAL:-2}
