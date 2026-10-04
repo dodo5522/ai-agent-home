@@ -66,18 +66,49 @@ Target sequence:
 | Session recovery | Exact Codex session IDs and bindings are recorded and restored after restart. | Local session files, exact binding validation, and live Herdr identity must agree; stale sessions start fresh only after their own mapping is cleared. |
 | PR lifecycle and cleanup | Guarded cleanup exists; PR/review retention rules are documented. | PR metadata command is reserved. Integration must preserve the coordinator and other Issues, including when the final Issue mapping is removed (#30). |
 
-Next implementer: read #9, #10, #12 and #30 together. Keep this document as the
-operational source of truth; update this table when capabilities land. Design
-the persistent coordinator ownership/Workspace mapping before automating
-dispatch, then implement role Pane/reviewer integration and validate two
-simultaneous Issues end to end. Acceptance must demonstrate distinct worker
-names, Panes, task mappings and contexts; concurrent reviews; result delivery;
-and approved cleanup of one Issue without affecting the other or the
-coordinator. Package boundaries are implemented on this branch: lifecycle owns
-Issue policy, `herdr_agents` owns generic Agent management and persistent
-reconciliation, and `herdr_runtime` exposes focused Workspace, Tab, Pane, and
-Agent clients from its `clients` package over the shared Herdr transport. JSON
-response types and field validation remain private runtime details.
+Keep this document as the operational source of truth and update the table
+when capabilities land. Acceptance must demonstrate distinct worker names,
+Panes, task mappings and contexts; concurrent reviews; result delivery; and
+approved cleanup of one Issue without affecting the other or the coordinator.
+Package boundaries are implemented on this branch: lifecycle owns Issue policy,
+`herdr_agents` owns generic Agent management and persistent reconciliation, and
+`herdr_runtime` exposes focused Workspace, Tab, Pane, and Agent clients from
+its `clients` package over the shared Herdr transport. JSON response types and
+field validation remain private runtime details.
+
+## Recommended implementation order
+
+As of 2026-10-04, the recommended order for the remaining general Herdr
+foundation work is:
+
+1. **#10 — Codex session mapping and recovery.** PR #56 merged an initial
+   implementation, but #10 remains open. Fresh `herdr-task start` attempts for
+   #57 and #60 have still failed with `Codex Agent has no session identity`.
+   The current opt-in integration test proves that a named Herdr workspace
+   survives a server restart; it does not exercise resuming an actual
+   multi-Agent conversation. Close that operational and test gap first.
+2. **#7 — GitHub App private-key separation.** Remove direct Agent access to
+   the private key before expanding unattended coordination and recovery.
+3. **#8 — Automatic crash bootstrap.** Re-run Agent reconciliation after a
+   Herdr server-only crash, building on reliable session identity and recovery.
+4. **#11 — Parallel ownership.** Define worktree-based ownership for multiple
+   Agents and simultaneous work without weakening task isolation.
+5. **#12 — Task-scoped reviewer.** Add reviewer Agents with task-scoped
+   identities and have the #30 coordinator manage their creation, findings,
+   and handoff to the Issue implementer.
+6. **#55 — Claude support.** Add Claude session mapping and restoration after
+   the lifecycle and ownership contracts are stable.
+7. **#6 — Provisioning.** Extend rebuild automation after the authentication
+   boundary and service behavior have been designed and exercised.
+
+This ranking is advisory, not a hard dependency graph. Expedite #55 when
+immediate Claude use is the goal, or #6 when provisioning a new VM is the
+priority. Issues #43 and #44 are Blender-specific and remain outside this
+general Herdr foundation order.
+
+A stale local `uv` dependency can separately make a worktree execute older
+local package code. Track and fix that development-environment problem as a
+follow-up; this ordering does not resolve it or claim that it is fixed.
 
 ## Task identity
 

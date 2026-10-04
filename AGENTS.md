@@ -36,6 +36,23 @@ When review feedback is received:
 - Do not create a new Pull Request unless explicitly requested.
 - Do not merge the Pull Request.
 
+## Recommended implementation order
+
+The canonical Herdr foundation Issue order is maintained in
+[`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md#recommended-implementation-order).
+When completing an Issue listed there, update that section in the same feature
+branch before creating or updating the Issue's Pull Request:
+
+- Remove the completed Issue from the list.
+- Move the remaining Issues up to fill its position while preserving their
+  relative order.
+- Keep the advisory-order note and any applicable priority exceptions accurate.
+
+Treat the Issue work as complete for this update when its implementation is
+ready for Pull Request review. Include the order update in that Issue's PR so
+the canonical list advances through reviewed changes without direct commits to
+`main`.
+
 ## After Pull Request merge
 
 When the user reports that a Pull Request has been merged:

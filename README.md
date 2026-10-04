@@ -128,7 +128,9 @@ bin/herdr-task start 32 --cwd /home/takashi/work/tasks/issue-32/worktree
 目指す運用は、リポジトリごとの常設受付AgentからIssue専用のimplementer／reviewerへ
 委譲する形です。自動振り分け・reviewer追加・結果回収は実装途中です。
 実装済み機能と残件は[引き継ぎ表](docs/HERDR-TASK-LIFECYCLE.md#target-operation-and-implementation-handoff)
-を参照してください。常設Agentを複数Issueの共有ワーカーとしては扱いません。
+を参照してください。Herdr基盤の推奨対応順は
+[Recommended implementation order](docs/HERDR-TASK-LIFECYCLE.md#recommended-implementation-order)
+に記載しています。常設Agentを複数Issueの共有ワーカーとしては扱いません。
 
 長期 Agent の定義は、まず `.config/ai-agent-home/agents.toml.example` を
 `.config/ai-agent-home/agents.toml` にコピーしてから、ローカル環境に合わせて設定します。
