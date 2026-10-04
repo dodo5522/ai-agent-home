@@ -66,18 +66,15 @@ Target sequence:
 | Session recovery | Exact Codex session IDs and bindings are recorded and restored after restart. | Local session files, exact binding validation, and live Herdr identity must agree; stale sessions start fresh only after their own mapping is cleared. |
 | PR lifecycle and cleanup | Guarded cleanup exists; PR/review retention rules are documented. | PR metadata command is reserved. Integration must preserve the coordinator and other Issues, including when the final Issue mapping is removed (#30). |
 
-Next implementer: read #9, #10, #12 and #30 together. Keep this document as the
-operational source of truth; update this table when capabilities land. Design
-the persistent coordinator ownership/Workspace mapping before automating
-dispatch, then implement role Pane/reviewer integration and validate two
-simultaneous Issues end to end. Acceptance must demonstrate distinct worker
-names, Panes, task mappings and contexts; concurrent reviews; result delivery;
-and approved cleanup of one Issue without affecting the other or the
-coordinator. Package boundaries are implemented on this branch: lifecycle owns
-Issue policy, `herdr_agents` owns generic Agent management and persistent
-reconciliation, and `herdr_runtime` exposes focused Workspace, Tab, Pane, and
-Agent clients from its `clients` package over the shared Herdr transport. JSON
-response types and field validation remain private runtime details.
+Keep this document as the operational source of truth and update the table
+when capabilities land. Acceptance must demonstrate distinct worker names,
+Panes, task mappings and contexts; concurrent reviews; result delivery; and
+approved cleanup of one Issue without affecting the other or the coordinator.
+Package boundaries are implemented on this branch: lifecycle owns Issue policy,
+`herdr_agents` owns generic Agent management and persistent reconciliation, and
+`herdr_runtime` exposes focused Workspace, Tab, Pane, and Agent clients from
+its `clients` package over the shared Herdr transport. JSON response types and
+field validation remain private runtime details.
 
 ## Recommended implementation order
 
