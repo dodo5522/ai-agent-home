@@ -32,10 +32,11 @@ def task(agent: AgentReference | None = None) -> Task:
 @dataclass
 class FakeManager:
     disposition: str
-    session_id: str = "session-a"
+    session_id: str | None = "session-a"
     targets: list[AgentTarget] = field(default_factory=list)
     prompts: list[tuple[str, str]] = field(default_factory=list)
     fail_prompt: bool = False
+    waits: list[AgentTarget] = field(default_factory=list)
 
     def ensure(self, target: AgentTarget) -> EnsuredAgent:
         self.targets.append(target)
@@ -55,6 +56,25 @@ class FakeManager:
         if self.fail_prompt:
             raise AgentManagementError("prompt failed")
         self.prompts.append((name, text))
+
+    def wait_for_session(self, target: AgentTarget, timeout_seconds: float = 10.0) -> AgentInfo:
+        self.waits.append(target)
+        return AgentInfo(
+            target.name, "codex", target.pane_id, target.workspace_id, target.cwd, "new-id"
+        )
+
+
+def test_fresh_agent_is_prompted_before_session_is_recorded() -> None:
+    current = task()
+    manager = FakeManager(disposition="fresh", session_id=None)
+
+    reference = TaskAgentStarter(manager).ensure_implementer(
+        TaskKey(current.repository, current.issue_number), current, "w16:p2"
+    )
+
+    assert len(manager.prompts) == 1
+    assert len(manager.waits) == 1
+    assert reference.agent_session_id == "new-id"
 
 
 def test_new_agent_uses_exact_target_and_receives_initial_prompt() -> None:

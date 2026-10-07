@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Protocol
 
 from herdr_agents import AgentTarget, EnsuredAgent
+from herdr_runtime import AgentInfo
 from herdr_task_state.model import AgentReference, Task, TaskKey
 
 from ...errors import LifecycleError
@@ -18,6 +19,9 @@ class TaskAgentManager(Protocol):
 
     def prompt(self, name: str, text: str) -> None:
         """Send a prompt to one named Agent."""
+
+    def wait_for_session(self, target: AgentTarget, timeout_seconds: float = 10.0) -> AgentInfo:
+        """Wait for Codex to disclose the started Agent's session identity."""
 
 
 def task_agent_name(task_key: TaskKey) -> str:
@@ -46,24 +50,24 @@ class TaskAgentStarter:
             raise LifecycleError("task has no Herdr workspace")
         if main.worktree is None or main.branch is None:
             raise LifecycleError("main workstream has incomplete Git identity")
-        result = self._manager.ensure(
-            AgentTarget(
-                name,
-                pane_id,
-                task.herdr.workspace_id,
-                Path(main.worktree),
-                task.herdr.workspace_label,
-                task.repository,
-                main.branch,
-            )
+        target = AgentTarget(
+            name,
+            pane_id,
+            task.herdr.workspace_id,
+            Path(main.worktree),
+            task.herdr.workspace_label,
+            task.repository,
+            main.branch,
         )
-        if result.agent.agent_session_id is None:
-            raise LifecycleError("implementer Agent has no Codex session identity")
+        result = self._manager.ensure(target)
         if result.disposition == "fresh":
             self._manager.prompt(result.agent.name, self._initial_prompt(task_key, task))
+        agent = result.agent
+        if agent.agent_session_id is None:
+            agent = self._manager.wait_for_session(target)
         return AgentReference(
-            name=result.agent.name,
-            agent_session_id=result.agent.agent_session_id,
+            name=agent.name,
+            agent_session_id=agent.agent_session_id,
         )
 
     @staticmethod
