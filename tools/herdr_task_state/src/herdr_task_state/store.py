@@ -212,6 +212,18 @@ class StateStore:
         return left == right
 
     @staticmethod
+    def _same_session_owner(left: AgentBinding, right: AgentBinding) -> bool:
+        """Allow a persistent Agent to move Panes while preserving its owner."""
+        return (
+            left.name == right.name
+            and left.repository == right.repository
+            and left.workspace_id == right.workspace_id
+            and left.workspace_label == right.workspace_label
+            and left.worktree == right.worktree
+            and left.branch == right.branch
+        )
+
+    @staticmethod
     def _persistent_mapping(name: str, agent: PersistentAgentReference) -> SessionMapping:
         binding = AgentBinding(
             name,
@@ -293,7 +305,7 @@ class StateStore:
                         self._write(validated)
                         return SessionMapping(binding, session_id)
             persistent = (current.persistent_agents or {}).get(binding.name)
-            if persistent is not None and not self._matches(
+            if persistent is not None and not self._same_session_owner(
                 self._persistent_mapping(binding.name, persistent).binding, binding
             ):
                 raise StateValidationError("Agent binding does not match state")

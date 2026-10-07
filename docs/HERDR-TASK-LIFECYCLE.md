@@ -78,27 +78,21 @@ field validation remain private runtime details.
 
 ## Recommended implementation order
 
-As of 2026-10-04, the recommended order for the remaining general Herdr
+As of 2026-10-07, the recommended order for the remaining general Herdr
 foundation work is:
 
-1. **#10 — Codex session mapping and recovery.** PR #56 merged an initial
-   implementation, but #10 remains open. Fresh `herdr-task start` attempts for
-   #57 and #60 have still failed with `Codex Agent has no session identity`.
-   The current opt-in integration test proves that a named Herdr workspace
-   survives a server restart; it does not exercise resuming an actual
-   multi-Agent conversation. Close that operational and test gap first.
-2. **#7 — GitHub App private-key separation.** Remove direct Agent access to
+1. **#7 — GitHub App private-key separation.** Remove direct Agent access to
    the private key before expanding unattended coordination and recovery.
-3. **#8 — Automatic crash bootstrap.** Re-run Agent reconciliation after a
+2. **#8 — Automatic crash bootstrap.** Re-run Agent reconciliation after a
    Herdr server-only crash, building on reliable session identity and recovery.
-4. **#11 — Parallel ownership.** Define worktree-based ownership for multiple
+3. **#11 — Parallel ownership.** Define worktree-based ownership for multiple
    Agents and simultaneous work without weakening task isolation.
-5. **#12 — Task-scoped reviewer.** Add reviewer Agents with task-scoped
+4. **#12 — Task-scoped reviewer.** Add reviewer Agents with task-scoped
    identities and have the #30 coordinator manage their creation, findings,
    and handoff to the Issue implementer.
-6. **#55 — Claude support.** Add Claude session mapping and restoration after
+5. **#55 — Claude support.** Add Claude session mapping and restoration after
    the lifecycle and ownership contracts are stable.
-7. **#6 — Provisioning.** Extend rebuild automation after the authentication
+6. **#6 — Provisioning.** Extend rebuild automation after the authentication
    boundary and service behavior have been designed and exercised.
 
 This ranking is advisory, not a hard dependency graph. Expedite #55 when
