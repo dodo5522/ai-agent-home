@@ -17,8 +17,11 @@ class FakeHerdr:
     start_arguments: list[tuple[str, ...]] = field(default_factory=list)
     fail_resume: bool = False
     recover_on_resume: bool = False
+    find_results: list[AgentInfo | None] = field(default_factory=list)
 
     def find(self, name: str) -> AgentInfo | None:
+        if self.find_results:
+            return self.find_results.pop(0)
         return next((agent for agent in self.live if agent.name == name), None)
 
     def start(
@@ -70,6 +73,45 @@ def test_absent_agent_is_started_on_the_exact_target() -> None:
     assert herdr.starts == [("codex-issue-9", "w16:p2", "codex")]
 
 
+def test_fresh_agent_without_session_can_wait_for_identity_after_prompt() -> None:
+    herdr = FakeHerdr(
+        started_override=AgentInfo("codex-issue-9", "codex", "w16:p2", "w16", Path("/work/issue-9"))
+    )
+    state = FakeSessions()
+    manager = AgentManager(herdr, state)
+
+    result = manager.ensure(mapped_target())
+    assert result.disposition == "fresh"
+    assert state.recorded == []
+
+    herdr.live.append(
+        AgentInfo("codex-issue-9", "codex", "w16:p2", "w16", Path("/work/issue-9"), "new-id")
+    )
+    observed = manager.wait_for_session(mapped_target(), timeout_seconds=0.1)
+    assert observed.agent_session_id == "new-id"
+    assert state.recorded == [(mapped_target().binding(), "new-id")]
+
+
+def test_wait_for_session_rejects_agent_moving_to_another_pane() -> None:
+    herdr = FakeHerdr(
+        live=[AgentInfo("codex-issue-9", "codex", "w16:p9", "w16", Path("/work/issue-9"))]
+    )
+
+    with pytest.raises(AgentManagementError, match="different pane"):
+        AgentManager(herdr, FakeSessions()).wait_for_session(mapped_target(), timeout_seconds=0)
+
+
+def test_wait_for_session_times_out_without_recording_incomplete_mapping() -> None:
+    herdr = FakeHerdr(
+        live=[AgentInfo("codex-issue-9", "codex", "w16:p2", "w16", Path("/work/issue-9"))]
+    )
+    state = FakeSessions()
+
+    with pytest.raises(AgentManagementError, match="no Codex session identity"):
+        AgentManager(herdr, state).wait_for_session(mapped_target(), timeout_seconds=0)
+    assert state.recorded == []
+
+
 def test_exact_live_agent_is_reused() -> None:
     existing = AgentInfo("codex-issue-9", "codex", "w16:p2", "w16", Path("/work/issue-9"))
     herdr = FakeHerdr(live=[existing])
@@ -79,6 +121,17 @@ def test_exact_live_agent_is_reused() -> None:
     assert result.started is False
     assert result.agent == existing
     assert herdr.starts == []
+
+
+def test_live_agent_can_replace_a_different_stored_session() -> None:
+    existing = AgentInfo(
+        "codex-issue-9", "codex", "w16:p2", "w16", Path("/work/issue-9"), "other-id"
+    )
+    state = FakeSessions(mapping("session-a"))
+
+    result = AgentManager(FakeHerdr(live=[existing]), state).ensure(mapped_target())
+    assert result.disposition == "live"
+    assert state.recorded == [(mapped_target().binding(), "other-id")]
 
 
 @pytest.mark.parametrize(
@@ -109,6 +162,7 @@ def test_prompt_targets_exact_agent_name() -> None:
     AgentManager(herdr).prompt("codex-issue-9", "begin")
 
     assert herdr.prompts == [("codex-issue-9", "begin")]
+
 
 @dataclass
 class FakeSessions:
@@ -149,6 +203,37 @@ def test_absent_agent_resumes_exact_usable_mapping() -> None:
 
     assert result.disposition == "resumed"
     assert herdr.start_arguments == [("resume", "session-a")]
+    assert state.recorded == [(mapped_target().binding(), "session-a")]
+
+
+def test_resume_places_manager_native_arguments_before_the_session_command() -> None:
+    herdr = FakeHerdr(
+        started_override=AgentInfo(
+            "codex-issue-9", "codex", "w16:p2", "w16", Path("/work/issue-9"), "session-a"
+        )
+    )
+    state = FakeSessions(mapping("session-a"))
+
+    AgentManager(
+        herdr,
+        state,
+        FakeInspector(True),
+        native_args=("--test-hook-argument",),
+    ).ensure(mapped_target())
+
+    assert herdr.start_arguments == [("--test-hook-argument", "resume", "session-a")]
+
+
+def test_successful_resume_without_reported_identity_uses_stored_mapping() -> None:
+    herdr = FakeHerdr(
+        started_override=AgentInfo("codex-issue-9", "codex", "w16:p2", "w16", Path("/work/issue-9"))
+    )
+    state = FakeSessions(mapping("session-a"))
+
+    result = AgentManager(herdr, state, FakeInspector(True)).ensure(mapped_target())
+
+    assert result.disposition == "resumed"
+    assert result.agent.agent_session_id == "session-a"
     assert state.recorded == [(mapped_target().binding(), "session-a")]
 
 
