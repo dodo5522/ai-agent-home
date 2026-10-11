@@ -4,7 +4,8 @@ from pathlib import Path
 import pytest
 from herdr_runtime import AgentInfo, PaneInfo, WorkspaceInfo
 
-from herdr_agents import AgentManagementError, AgentManager
+from herdr_agents import AgentManagementError, AgentManager, AgentTarget, EnsuredAgent
+from herdr_agents.bindings import GitBinding
 from herdr_agents.persistent.cli import _default_config, reconcile
 from herdr_agents.persistent.config import AgentDefinition
 from herdr_agents.persistent.reconciler import AgentReconcileResult
@@ -156,3 +157,38 @@ def test_live_configured_agent_is_skipped_before_resolving_an_available_pane(
     )
 
     assert result == AgentReconcileResult((), ("codex-main",), ())
+
+
+def test_reconcile_forwards_git_binding_to_persistent_agent_target(tmp_path: Path) -> None:
+    recorded: list[AgentTarget] = []
+
+    class RecordingManager:
+        def ensure(self, target: AgentTarget) -> EnsuredAgent:
+            recorded.append(target)
+            return EnsuredAgent(
+                AgentInfo(target.name, "codex", target.pane_id, target.workspace_id, target.cwd),
+                "fresh",
+            )
+
+    config = tmp_path / "agents.toml"
+    config.write_text(
+        """
+        [agents.codex-main]
+        role = "coordinator"
+        workspace = "owner/repo"
+        cwd = "/work/main"
+        """,
+        encoding="utf-8",
+    )
+
+    result = reconcile(
+        config,
+        RecordingManager(),
+        FakeHerdr(),
+        resolve,
+        lambda cwd: GitBinding("owner/repo", "feat/persistent"),
+    )
+
+    assert result == AgentReconcileResult(("codex-main",), (), ())
+    assert recorded[0].binding().repository == "owner/repo"
+    assert recorded[0].binding().branch == "feat/persistent"

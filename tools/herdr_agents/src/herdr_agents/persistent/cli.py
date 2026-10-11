@@ -9,7 +9,7 @@ from pathlib import Path
 from herdr_runtime import AgentInfo, HerdrClient, HerdrRuntimeError, PaneInfo, SubprocessRunner
 from herdr_task_state.store import StateStore
 
-from ..bindings import resolve_git_binding
+from ..bindings import GitBinding, resolve_git_binding
 from ..codex_sessions import CodexSessionFiles
 from ..errors import AgentManagementError
 from ..service import AgentManager, AgentOperations
@@ -23,10 +23,11 @@ def reconcile(
     manager: AgentManager,
     agents: AgentOperations,
     pane_resolver: Callable[[AgentDefinition, AgentInfo | None], PaneInfo],
+    binding_resolver: Callable[[Path], GitBinding] | None = None,
 ) -> AgentReconcileResult:
     """Load persistent definitions and reconcile them independently."""
     definitions = load_agent_definitions(config_path)
-    return AgentReconciler(manager, agents, pane_resolver).reconcile(definitions)
+    return AgentReconciler(manager, agents, pane_resolver, binding_resolver).reconcile(definitions)
 
 
 def _default_config() -> Path:
