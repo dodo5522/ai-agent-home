@@ -53,39 +53,11 @@ ready for Pull Request review. Include the order update in that Issue's PR so
 the canonical list advances through reviewed changes without direct commits to
 `main`.
 
-## After Pull Request merge
+## Herdr task details
 
-When the user reports that a Pull Request has been merged:
-
-- Switch to `main`.
-- Pull the latest changes from `origin/main` using fast-forward only.
-- Confirm that the local `main` matches `origin/main`.
-- Follow the cleanup plan, approval, execution, and retry process in
-  [`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md).
-
-## Workspace location
-
-When creating additional working data:
-
-- Create a unique task root under `/home/takashi/work/tasks/<task-id>/`.
-- Create a `.codex-task-root` marker file directly inside the task root.
-- Place all Git worktrees, cloned repositories, and agent-managed temporary data for that task inside its task root, using subdirectories such as `worktree/`, `repo/`, and `tmp/`.
-- Do not create these resources outside the task root unless the user explicitly requests another location or a tool requires a system-managed temporary location.
-- Keep the task root while its Pull Request is open or may still receive review updates.
-- For Issue implementation, create the feature worktree under the marked task root, then run `bin/herdr-task start ISSUE --cwd WORKTREE` before creating implementation or investigation artifacts. The cwd must be the root of a registered non-primary Git worktree with an attached branch; do not use the primary checkout or a detached worktree.
-
-## Task workspace cleanup
-
-The canonical resource roles, retention triggers, managed-resource boundary,
-and exact cleanup procedure are in
-[`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md). Keep the Tab,
-worktree, task root, and state mapping while a Pull Request is open or under
-review. For non-PR work, wait for explicit user completion confirmation.
-Always show a fresh `herdr-task cleanup ISSUE --plan --remove-untracked` so
-Git-untracked, non-ignored paths are included in the approval scope. Obtain
-human approval, then repeat `--remove-untracked` and use the plan's exact task
-root for guarded execution. Never clean up unmanaged or another task's
-resources.
+The shared Codex Issue workflow is in [`.codex/AGENTS.md`](.codex/AGENTS.md).
+This repository's resource model and exact cleanup procedure are in
+[`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md).
 
 ## Commit policy
 

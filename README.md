@@ -112,6 +112,13 @@ Google Driveへの転送は既存の `bin/google-drive-uploader` を利用しま
 
 ### Herdr タスクライフサイクル
 
+Codex のリポジトリ共通の Issue 作業・cleanup 規則は
+[`.codex/AGENTS.md`](.codex/AGENTS.md) に置きます。このホームディレクトリを
+`/home/takashi` として利用すると `~/.codex/AGENTS.md` になり、新しい Codex
+セッションから blog-tech や blog-pet でも読み込まれます。既存セッションには
+自動反映されません。両リポジトリにツールや `.codex` を複製する必要はなく、
+PATH 上の `/home/takashi/bin/herdr-task` を利用します。
+
 Issue 対応の開始、PR / review 中の保持、安全な cleanup と再試行の運用規則は
 [`docs/HERDR-TASK-LIFECYCLE.md`](docs/HERDR-TASK-LIFECYCLE.md) を参照してください。
 状態ファイルのスキーマと低レベル CLI は
