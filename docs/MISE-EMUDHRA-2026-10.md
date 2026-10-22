@@ -13,7 +13,8 @@ certificate. See [Mozilla's incident report](https://blog.mozilla.org/security/2
 | uv | Pin 0.13.4. | The [0.13.4 release](https://github.com/astral-sh/uv/releases/tag/0.13.4) updates `webpki-root-certs` to 1.0.10. Its [security advisory](https://github.com/astral-sh/uv/security/advisories/GHSA-hq85-5cpj-mr62) identifies 0.13.4 as the patched version. |
 | Python | Pin 3.14.9. | The [3.14.9 security release](https://www.python.org/downloads/release/python-3149/) upgrades its embedded pip to 26.2.2 with certifi 2026.10.19 for this incident. The mise-installed 3.14.7 runtime had pip 26.2.1 and vendored certifi 2026.06.17, whose bundle contained the affected root. Standard-library `ssl` used `/etc/ssl/certs` on this host. |
 | Blender | Keep 5.2.2 and refresh its bundled certifi and pip after mise installs it. | Its bundled Python used certifi 2025.04.26 and the affected root was present. The official [5.2.3 Linux archive](https://download.blender.org/release/Blender5.2/blender-5.2.3-linux-x64.tar.xz), available on 2026-10-22, contained a `certifi/cacert.pem` byte-identical to 5.2.2. The [certifi advisory](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2) identifies 2026.10.19 as patched. `bin/update-blender-certificates` uses pinned uv to install certifi 2026.10.19 and pip 26.2.2 into Blender's bundled Python. `install.sh` runs this command after `mise install`; run it separately after a direct Blender reinstall. |
-| Codex CLI | Keep 0.155.1. | The version's [HTTP client source](https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/http-client/src/custom_ca.rs) loads native system roots by default; no eMudhra-specific fixed Codex version was identified. A custom `CODEX_CA_CERTIFICATE` or `SSL_CERT_FILE` bundle still needs separate inspection. |
+| Claude Code | Carry forward the user's 2.1.283 pin from the primary checkout's uncommitted config. | This pin was not selected as a direct eMudhra CA remediation. The [2.1.283 release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.283) do not identify an eMudhra-specific fix. Its TLS trust configuration and any custom CA bundles need separate review. |
+| Codex CLI | Carry forward the user's 0.160.1 pin from the primary checkout's uncommitted config. | This pin was not selected as a direct eMudhra CA remediation. No eMudhra-specific fixed Codex version was identified; custom `CODEX_CA_CERTIFICATE` or `SSL_CERT_FILE` bundles still need separate inspection. |
 | Herdr | Keep 0.8.2. | The [0.8.2 dependency manifest](https://github.com/herdrdev/herdr/blob/v0.8.2/Cargo.toml) and lockfile do not declare a TLS client or bundled CA dependency. No relevant fixed Herdr version was identified. |
 
 These decisions concern the mise-managed executables on this host. They do not
@@ -23,17 +24,23 @@ maintenance responsibility.
 
 ## Apply and verify
 
-From the feature worktree, install only the changed mise tools:
+From the feature worktree, install only the changed mise tools and the two
+user-provided pins carried forward from the primary checkout:
 
 ```bash
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise install node python uv
+MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise install claude codex
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise exec node -- node --version
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise exec python -- python --version
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise exec python -- python -m pip --version
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise exec uv -- uv --version
+MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise exec claude -- claude --version
+MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise exec codex -- codex --version
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise which node
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise which python
 MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise which uv
+MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise which claude
+MISE_GLOBAL_CONFIG_FILE="$PWD/.config/mise/config.toml" mise which codex
 bin/update-blender-certificates
 ```
 
@@ -72,6 +79,10 @@ which` selected `/home/takashi/.local/share/mise/installs/node/24.22.1/bin/node`
 executables reported `v24.22.1`, `Python 3.14.9` with `pip 26.2.2`, and
 `uv 0.13.4`. The new pip reported vendored certifi 2026.10.19; parsing its
 bundle and Node's built-in roots found no `emSign ECC Root CA - G3`.
+The carried-forward pins resolved to
+`/home/takashi/.local/share/mise/installs/claude/2.1.283/claude` and
+`/home/takashi/.local/share/mise/installs/codex/0.160.1/bin/codex`, reporting
+`2.1.283 (Claude Code)` and `codex-cli 0.160.1`.
 Blender's two bundled `cacert.pem` files also contained no affected root after
 the refresh; its embedded Python reported certifi 2026.10.19 and pip's vendored
 certifi 2026.10.19. Blender itself remained at 5.2.2.

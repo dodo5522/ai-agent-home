@@ -21,7 +21,7 @@ Codex セッションを自動復旧するためのホームディレクトリ�
   (`libgl1`、`libsm6`、`libx11-6` など)
 - Tailscale
 - mise管理のBlender 5.2.2
-- `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python、uv
+- `.config/mise/config.toml` に固定された Claude Code、Codex CLI、Herdr、Node.js、Python、uv
 - `bin/get-github-app-token.py` が使用する Python パッケージ `PyJWT[crypto]`
 
 既に存在する Tailscale と mise は再インストールしません。`apt-get`、
