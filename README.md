@@ -21,7 +21,7 @@ Codex セッションを自動復旧するためのホームディレクトリ�
   (`libgl1`、`libsm6`、`libx11-6` など)
 - Tailscale
 - mise管理のBlender 5.2.2
-- `.config/mise/config.toml` に固定された Codex CLI、Herdr、Node.js、Python、uv
+- `.config/mise/config.toml` に固定された Claude Code、Codex CLI、Herdr、Node.js、Python、uv
 - `bin/get-github-app-token.py` が使用する Python パッケージ `PyJWT[crypto]`
 
 既に存在する Tailscale と mise は再インストールしません。`apt-get`、
@@ -193,6 +193,9 @@ systemctl --user status herdr.service herdr-agents.service
 
 `.config/mise/config.toml` のバージョンを変更した後は、`./install.sh` を再実行して
 ください。固定済みツールと Python パッケージが現在の定義に合わせて更新されます。
+
+eMudhra CA 事案に伴う mise 管理ツールのみの更新判断と個別の導入・確認手順は
+[専用手順](docs/MISE-EMUDHRA-2026-10.md)を参照してください。
 
 ## トラブルシューティング
 

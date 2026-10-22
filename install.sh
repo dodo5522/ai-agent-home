@@ -170,6 +170,9 @@ else
     MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG_FILE" "$mise_bin" install
 fi
 
+log "updating Blender certificate bundles"
+run "$REPO_ROOT/bin/update-blender-certificates"
+
 log "installing Python packages"
 if [[ $DRY_RUN == true ]]; then
     printf "+ MISE_GLOBAL_CONFIG_FILE=%q %q exec python -- python -m pip install --upgrade '%s'\n" \

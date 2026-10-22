@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+mise_config="$repo_root/.config/mise/config.toml"
+mise_bin=${MISE_BIN:-$HOME/.local/bin/mise}
+
+blender_bin=$(MISE_GLOBAL_CONFIG_FILE="$mise_config" "$mise_bin" which blender)
+blender_python="$(dirname "$blender_bin")/5.2/python/bin/python3.13"
+if [[ ! -x $blender_python ]]; then
+    printf 'Blender Python not found: %s\n' "$blender_python" >&2
+    exit 1
+fi
+
+MISE_GLOBAL_CONFIG_FILE="$mise_config" "$mise_bin" exec uv -- \
+    uv pip install --python "$blender_python" --no-deps \
+    'certifi==2026.10.19' 'pip==26.2.2'
+
+"$blender_python" -c '
+import hashlib
+import re
+import ssl
+from pathlib import Path
+
+import certifi
+import pip._vendor.certifi as pip_certifi
+
+blocked_fingerprint = bytes.fromhex(
+    "86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b"
+)
+for package in (certifi, pip_certifi):
+    if package.__version__ != "2026.10.19":
+        raise SystemExit(f"unexpected certifi version: {package.__version__}")
+    bundle = Path(package.where()).read_bytes()
+    certificates = re.findall(
+        rb"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----",
+        bundle,
+        re.DOTALL,
+    )
+    if not certificates:
+        raise SystemExit(f"empty certificate bundle: {package.where()}")
+    for certificate in certificates:
+        digest = hashlib.sha256(ssl.PEM_cert_to_DER_cert(certificate.decode())).digest()
+        if digest == blocked_fingerprint:
+            raise SystemExit(f"compromised emSign root remains: {package.where()}")
+'

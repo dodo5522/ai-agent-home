@@ -100,7 +100,7 @@ When adding a tool or automation with non-trivial logic:
 - Keep shell scripts limited to simple orchestration, argument/environment setup, or thin wrappers around Python tools.
 - Prefer Python standard-library modules whenever they are sufficient.
 - If a well-established third-party package materially reduces the implementation, manage it with `uv`, pin exact dependency versions, and commit the resulting project metadata and lockfile.
-- Install and manage `uv` through mise; keep its version pinned in `.config/mise/config.toml` (the current approved pin is `0.12.11`).
+- Install and manage `uv` through mise; keep its version pinned in `.config/mise/config.toml` (the current approved pin is `0.13.4`).
 - Do not install project dependencies ad hoc with a system `pip`; use the mise-managed Python and the repository's documented `uv` workflow.
 - Make Python tools directly runnable with `uvx` (or the equivalent `uv run` project command).
 - Use pytest for tests, shared setup through fixtures, and Ruff for formatting and linting.
