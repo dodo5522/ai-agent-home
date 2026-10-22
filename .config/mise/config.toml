@@ -1,6 +1,6 @@
 [tools]
 blender = "5.2.2"
-claude = "2.1.283"
+claude = "2.1.303"
 codex = "0.160.1"
 herdr = "0.8.2"
 node = "24.22.1"
